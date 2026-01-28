@@ -140,3 +140,4 @@ vite.config.ts.timestamp-*
 
 # Extra
 local.settings.json
+*.pem

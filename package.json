@@ -2,7 +2,7 @@
   "name": "wherebaro-functions",
   "version": "1.0.0",
   "type": "module",
-  "main": "dist/functions/**/*.js",
+  "main": "dist/src/functions/**/*.js",
   "scripts": {
     "build": "tsc",
     "prestart": "npm run build",
@@ -10,8 +10,12 @@
     "watch": "tsc -w"
   },
   "dependencies": {
+    "@azure/cosmos": "^4.9.0",
     "@azure/functions": "^4.5.0",
-    "cheerio": "^1.2.0"
+    "@azure/identity": "^4.13.0",
+    "cheerio": "^1.2.0",
+    "dotenv": "^17.2.3",
+    "mongodb": "^7.0.0"
   },
   "devDependencies": {
     "ts-node": "^10.9.2",
