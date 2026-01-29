@@ -2,8 +2,7 @@ import { ObjectId } from "mongodb";
 
 export default class BaroItem {
     constructor(
-        public name: string, 
-        public uniqueName: string,
+        public name: string,
         public image: string,
         public link: string,
         public creditPrice: number, 
@@ -11,7 +10,6 @@ export default class BaroItem {
         public type: string, 
         public offeringDates: string[],
         public likes: number,
-        public reviews: string[],
-        public id?: ObjectId
+        public reviews: string[]
     ) {}
 }

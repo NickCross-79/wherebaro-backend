@@ -16,9 +16,6 @@ const getLuaData = async (url: string): Promise<string> => {
   }
 };
 
-/**
- * More robust Lua to JSON converter using recursive parsing
- */
 function luaToJson(luaString: string): any {
   // Remove comments
   let str = luaString.replace(/--[^\n]*/g, '');
@@ -180,30 +177,6 @@ function luaToJson(luaString: string): any {
   }
   
   return parseValue();
-}
-
-// Example usage
-async function convertLuaToJson() {
-  const luaData = await getLuaData(baroDataURL);
-  
-  if (!luaData) {
-    console.error('No Lua data retrieved');
-    return null;
-  }
-  
-  try {
-    const jsonData = luaToJson(luaData);
-    
-    // Save to file
-    const outputPath = path.join(os.tmpdir(), 'baro-data.json');
-    await fs.writeFile(outputPath, JSON.stringify(jsonData, null, 2));
-    
-    console.log(`Converted Lua data to JSON and saved to: ${outputPath}`);
-    return jsonData;
-  } catch (error) {
-    console.error('Conversion failed:', error);
-    return null;
-  }
 }
 
 async function scrape() {
