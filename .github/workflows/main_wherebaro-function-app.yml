@@ -2,8 +2,7 @@ name: Build and deploy Node.js project to Azure Function App - wherebaro-functio
 
 on:
   push:
-    branches:
-      - main
+    branches: [ main ]
   workflow_dispatch:
 
 jobs:
@@ -26,9 +25,4 @@ jobs:
           app-name: wherebaro-function-app
           slot-name: Production
           package: .
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C176C977065E4DE5B174105C67537BEA }}
-
-          slot-name: 'Production'
-          package: ${{ env.AZURE_FUNCTIONAPP_PACKAGE_PATH }}
-
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C176C977065E4DE5B174105C67537BEA }}
