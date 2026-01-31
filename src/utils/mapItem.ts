@@ -1,4 +1,4 @@
-import BaroItem from "../models/baroItem.js";
+import Item from "../models/Item.js";
 
 export interface RawBaroItemData {
     Name: string;
@@ -13,12 +13,12 @@ export interface RawBaroItemData {
 }
 
 /**
- * Maps raw Baro Ki'Teer item data to BaroItem model
+ * Maps raw Baro Ki'Teer item data to Item model
  * Combines all platform offering dates into a single sorted array
  */
-export function mapRawItemToBaroItem(rawData: any): BaroItem {
+export function mapRawItemToBaroItem(rawData: any): Item {
 
-    return new BaroItem(
+    return new Item(
         rawData.Name,
         rawData.Image,
         rawData.Link,
@@ -35,7 +35,7 @@ export function mapRawItemToBaroItem(rawData: any): BaroItem {
  * Maps a collection of raw items (from JSON data)
  * @param rawItems Object with item names as keys and item data as values
  */
-export function mapRawItemsCollection(rawItems: Record<string, RawBaroItemData>): BaroItem[] {
+export function mapRawItemsCollection(rawItems: Record<string, RawBaroItemData>): Item[] {
     return Object.entries(rawItems).map(([_, itemData]) => 
         mapRawItemToBaroItem(itemData)
     );

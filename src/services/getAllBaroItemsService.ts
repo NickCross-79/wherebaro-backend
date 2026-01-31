@@ -1,13 +1,13 @@
 import { collections, connectToDatabase } from "../db/database.service.js";
-import BaroItem from "../models/baroItem.js";
+import Item from "../models/Item.js";
 
-export async function fetchAllBaroItems(): Promise<BaroItem[]> {
+export async function fetchAllBaroItems(): Promise<Item[]> {
     await connectToDatabase();
 
-    if (!collections.baroItems) {
+    if (!collections.items) {
         throw new Error("Database collection not initialized");
     }
 
-    const items = await collections.baroItems.find({}).toArray();
-    return items as unknown as BaroItem[];
+    const items = await collections.items.find({}).toArray();
+    return items as unknown as Item[];
 }

@@ -2,7 +2,6 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/fu
 import { seedDB } from "../../jobs/seedDB.job.js";
 import { collections, connectToDatabase } from "../../db/database.service.js";
 import { ObjectId } from "mongodb";
-import BaroItem from "../../models/baroItem.js";
 
 export async function seedDBFunction(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);

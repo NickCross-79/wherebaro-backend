@@ -5,7 +5,7 @@ import * as dns from 'dns';
 // Configure DNS to use Google/Cloudflare DNS servers
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
-export const collections: { baroItems?: mongoDB.Collection } = {}
+export const collections: { items?: mongoDB.Collection; current?: mongoDB.Collection } = {}
 
 export async function connectToDatabase () {
     dotenv.config();
@@ -28,9 +28,11 @@ export async function connectToDatabase () {
         
     const db: mongoDB.Db = client.db("wherebaro");
   
-    const baroItemsCollection: mongoDB.Collection = db.collection("baroItems");
+    const itemsCollection: mongoDB.Collection = db.collection("items");
+    const currentCollection: mongoDB.Collection = db.collection("current");
 
-    collections.baroItems = baroItemsCollection;
+    collections.items = itemsCollection;
+    collections.current = currentCollection;
       
-    console.log(`Successfully connected to database: ${db.databaseName} and collection: ${baroItemsCollection.collectionName}`);
+    console.log(`Successfully connected to database: ${db.databaseName} and collections: ${itemsCollection.collectionName}, ${currentCollection.collectionName}`);
 }
