@@ -7,6 +7,7 @@ export interface ReviewPayload {
     user: string;
     content: string;
     date: string;
+    time: string;
     uid: string;
 }
 
@@ -18,6 +19,7 @@ export async function postReviewJob(reviewPayload: ReviewPayload): Promise<Revie
         reviewPayload.user,
         reviewPayload.content,
         reviewPayload.date,
+        reviewPayload.time,
         reviewPayload.uid
     );
 

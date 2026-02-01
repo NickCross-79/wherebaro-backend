@@ -34,6 +34,7 @@ export async function getReviewsForItem(itemId: ObjectId): Promise<Review[]> {
     const reviewIds = item.reviews.map((id: string) => new ObjectId(id));
     const reviews = await collections.reviews
         .find({ _id: { $in: reviewIds } })
+        .sort({ date: -1 })
         .toArray();
 
     console.log(`✅ Fetched ${reviews.length} reviews for item ${itemId}`);

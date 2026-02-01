@@ -7,6 +7,7 @@ export default class Review {
         public user: string,
         public content: string,
         public date: string,
+        public time: string,
         public uid: string
     ) {}
 }
