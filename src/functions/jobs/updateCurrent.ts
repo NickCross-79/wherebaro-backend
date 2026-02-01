@@ -12,8 +12,7 @@ export async function updateBaroCurrentWeekly(myTimer: Timer, context: Invocatio
     }
 }
 
-// Temporarily disabled for debugging
-// app.timer("updateBaroCurrentWeekly", {
-//     schedule: "0 55 13 * * Fri",
-//     handler: updateBaroCurrentWeekly
-// });
+app.timer("updateBaroCurrentWeekly", {
+    schedule: "0 55 13 * * Fri",
+    handler: updateBaroCurrentWeekly
+});
