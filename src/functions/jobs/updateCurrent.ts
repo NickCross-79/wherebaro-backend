@@ -12,9 +12,8 @@ export async function updateBaroCurrentWeekly(myTimer: Timer, context: Invocatio
     }
 }
 
-// 8:55 AM EST every Friday (13:55 UTC)
-// Azure uses 6-field CRON: second minute hour day month dayOfWeek
-app.timer("updateBaroCurrentWeekly", {
-    schedule: "0 55 13 * * Fri",
-    handler: updateBaroCurrentWeekly
-});
+// Temporarily disabled for debugging
+// app.timer("updateBaroCurrentWeekly", {
+//     schedule: "0 55 13 * * Fri",
+//     handler: updateBaroCurrentWeekly
+// });
