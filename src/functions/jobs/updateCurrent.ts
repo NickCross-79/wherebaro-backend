@@ -13,7 +13,9 @@ export async function updateCurrentTimer(myTimer: Timer, context: InvocationCont
 }
 
 // 8:55 AM EST every Friday (13:55 UTC)
+// CRON format: {second} {minute} {hour} {day} {month} {day-of-week}
+// Friday = 5, use * for day and month to avoid conflicts
 app.timer("updateBaroCurrentWeekly", {
-    schedule: "0 55 13 * * 5",
+    schedule: "0 55 13 * * Fri",
     handler: updateCurrentTimer
 });
