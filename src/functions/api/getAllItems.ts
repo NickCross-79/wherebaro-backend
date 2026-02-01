@@ -1,11 +1,11 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { getBaroCurrentJob } from "../../jobs/getBaroCurrent.job.js";
+import { getAllItemsJob } from "../../jobs/getAllItems.job.js";
 
-export async function getBaroCurrent(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export async function getAllItems(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);
 
     try {
-        const baroData = await getBaroCurrentJob();
+        const items = await getAllItemsJob();
 
         return {
             status: 200,
@@ -15,22 +15,22 @@ export async function getBaroCurrent(request: HttpRequest, context: InvocationCo
                 "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type"
             },
-            body: JSON.stringify(baroData)
+            body: JSON.stringify(items)
         };
     } catch (error) {
-        context.error(`Error fetching current baro data: ${error}`);
+        context.error(`Error fetching baro items: ${error}`);
         return {
             status: 500,
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({ error: "Failed to fetch current baro data" })
+            body: JSON.stringify({ error: "Failed to fetch baro items" })
         };
     }
 };
 
-app.http('getBaroCurrent', {
+app.http('getAllItems', {
     methods: ['GET', 'POST'],
     authLevel: 'anonymous',
-    handler: getBaroCurrent
+    handler: getAllItems
 });

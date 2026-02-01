@@ -9,7 +9,7 @@ export interface CurrentBaroData {
     items: any[];
 }
 
-export async function fetchBaroCurrent(): Promise<CurrentBaroData> {
+export async function fetchCurrent(): Promise<CurrentBaroData> {
     await connectToDatabase();
 
     if (!collections.current) {

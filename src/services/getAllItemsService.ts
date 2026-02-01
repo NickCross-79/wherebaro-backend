@@ -1,7 +1,7 @@
 import { collections, connectToDatabase } from "../db/database.service.js";
 import Item from "../models/Item.js";
 
-export async function fetchAllBaroItems(): Promise<Item[]> {
+export async function fetchAllItems(): Promise<Item[]> {
     await connectToDatabase();
 
     if (!collections.items) {

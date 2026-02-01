@@ -1,15 +1,5 @@
-import { MongoClient, Db } from "mongodb";
 import { collections, connectToDatabase } from "../db/database.service.js";
 import Item from "../models/Item.js";
-import dotenv from "dotenv";
-
-dotenv.config();
-
-const uri = process.env.MONGODB_URI;
-const dbName = process.env.DB_NAME;
-
-let client: MongoClient;
-let db: Db;
 
 /**
  * Inserts multiple Items into the database
@@ -23,7 +13,7 @@ export async function insertBaroItems(items: Item[]): Promise<Item[]> {
         throw new Error("Database collection not initialized");
     }
 
-    const result = await collections.items.insertMany(items);
+    await collections.items.insertMany(items);
     
     console.log(`✅ Inserted ${items.length} items into the database`);
     return items;

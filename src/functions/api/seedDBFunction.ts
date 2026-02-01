@@ -1,7 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { seedDB } from "../../jobs/seedDB.job.js";
-import { collections, connectToDatabase } from "../../db/database.service.js";
-import { ObjectId } from "mongodb";
 
 export async function seedDBFunction(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);
