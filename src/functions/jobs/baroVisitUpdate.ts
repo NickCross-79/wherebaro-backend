@@ -1,7 +1,7 @@
 import { app, InvocationContext, Timer } from "@azure/functions";
 import { updateCurrentJob } from "../../jobs/updateCurrent.job.js";
 
-export async function updateBaroCurrentWeekly(myTimer: Timer, context: InvocationContext): Promise<void> {
+export async function baroVisitUpdate(myTimer: Timer, context: InvocationContext): Promise<void> {
     context.log(`Weekly Baro update started at ${new Date().toISOString()}`);
 
     try {
@@ -12,7 +12,7 @@ export async function updateBaroCurrentWeekly(myTimer: Timer, context: Invocatio
     }
 }
 
-app.timer("updateBaroCurrentWeekly", {
+app.timer("baroVisitUpdate", {
     schedule: "0 55 13 * * Fri",
-    handler: updateBaroCurrentWeekly
+    handler: baroVisitUpdate
 });
