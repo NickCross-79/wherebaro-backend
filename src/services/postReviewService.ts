@@ -18,6 +18,17 @@ export async function postReview(review: Review): Promise<Review> {
         throw new Error("Items collection not initialized");
     }
 
+    const existingReview = await collections.reviews.findOne({
+        item_oid: review.item_oid,
+        uid: review.uid
+    });
+
+    if (existingReview) {
+        const error = new Error("User has already reviewed this item");
+        (error as any).code = "REVIEW_EXISTS";
+        throw error;
+    }
+
     // Insert the review into the reviews collection
     const result = await collections.reviews.insertOne(review);
     

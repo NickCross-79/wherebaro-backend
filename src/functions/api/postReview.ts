@@ -40,6 +40,19 @@ export async function postReview(request: HttpRequest, context: InvocationContex
     } catch (error) {
         context.error(`Error posting review: ${error}`);
         const errorMessage = error instanceof Error ? error.message : "Unknown error";
+        const errorCode = (error as any)?.code;
+
+        if (errorCode === "REVIEW_EXISTS" || errorCode === 11000) {
+            return {
+                status: 409,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify({ error: "User has already reviewed this item" })
+            };
+        }
+
         return {
             status: 500,
             headers: {

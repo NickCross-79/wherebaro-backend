@@ -35,6 +35,8 @@ export async function connectToDatabase () {
     collections.items = itemsCollection;
     collections.current = currentCollection;
     collections.reviews = reviewsCollection;
+
+    await reviewsCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
       
     console.log(`Successfully connected to database: ${db.databaseName} and collections: ${itemsCollection.collectionName}, ${currentCollection.collectionName}, ${reviewsCollection.collectionName}`);
 }
