@@ -5,7 +5,7 @@ import * as dns from 'dns';
 // Configure DNS to use Google/Cloudflare DNS servers
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
-export const collections: { items?: mongoDB.Collection; current?: mongoDB.Collection } = {}
+export const collections: { items?: mongoDB.Collection; current?: mongoDB.Collection; reviews?: mongoDB.Collection } = {}
 
 export async function connectToDatabase () {
     dotenv.config();
@@ -30,9 +30,11 @@ export async function connectToDatabase () {
   
     const itemsCollection: mongoDB.Collection = db.collection("items");
     const currentCollection: mongoDB.Collection = db.collection("current");
+    const reviewsCollection: mongoDB.Collection = db.collection("reviews");
 
     collections.items = itemsCollection;
     collections.current = currentCollection;
+    collections.reviews = reviewsCollection;
       
-    console.log(`Successfully connected to database: ${db.databaseName} and collections: ${itemsCollection.collectionName}, ${currentCollection.collectionName}`);
+    console.log(`Successfully connected to database: ${db.databaseName} and collections: ${itemsCollection.collectionName}, ${currentCollection.collectionName}, ${reviewsCollection.collectionName}`);
 }
