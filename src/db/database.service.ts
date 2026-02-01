@@ -3,7 +3,7 @@ import * as dotenv from "dotenv";
 import * as dns from 'dns';
 
 // Configure DNS to use Google/Cloudflare DNS servers
-dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
+//dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
 export const collections: { items?: mongoDB.Collection; current?: mongoDB.Collection } = {}
 
