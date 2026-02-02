@@ -56,7 +56,7 @@ async function insertNewItemIfMissing(itemName: string, itemData: BaroApiInvento
             itemData?.ducats ?? 0,
             "Unknown",
             [today],
-            0,
+            [],
             []
         );
 
