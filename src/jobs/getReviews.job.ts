@@ -1,4 +1,4 @@
-import { getReviewsForItem } from "../services/getReviewsService.js";
+import { getReviewsForItem } from "../services/reviewService.js";
 import Review from "../models/Review.js";
 import { ObjectId } from "mongodb";
 

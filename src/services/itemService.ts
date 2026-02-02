@@ -1,6 +1,10 @@
 import { collections, connectToDatabase } from "../db/database.service.js";
 import Item from "../models/Item.js";
 
+/**
+ * Fetches all items from the database
+ * @returns Array of all Item objects
+ */
 export async function fetchAllItems(): Promise<Item[]> {
     await connectToDatabase();
 

@@ -1,4 +1,4 @@
-import { updateReview } from "../services/updateReviewService.js";
+import { updateReview } from "../services/reviewService.js";
 import Review from "../models/Review.js";
 import { ObjectId } from "mongodb";
 
