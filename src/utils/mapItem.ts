@@ -26,7 +26,7 @@ export function mapRawItemToBaroItem(rawData: any): Item {
         rawData.DucatCost,
         rawData.Type,
         rawData.OfferingDates,
-        0, // Initial likes count
+        [], // Initial empty likes array
         []  // Initial empty reviews array
     );
 }

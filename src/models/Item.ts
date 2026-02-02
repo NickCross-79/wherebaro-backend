@@ -9,7 +9,7 @@ export default class Item {
         public ducatPrice: number,
         public type: string, 
         public offeringDates: string[],
-        public likes: number,
+        public likes: string[],
         public reviews: string[]
     ) {}
 }
