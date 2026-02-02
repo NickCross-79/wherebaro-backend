@@ -58,3 +58,24 @@ export async function removeLike(itemId: ObjectId, uid: string): Promise<boolean
 
     return true;
 }
+
+/**
+ * Fetches all likes for a specific item
+ * @param itemId The MongoDB ObjectId of the item
+ * @returns Array of Like objects for that item
+ */
+export async function getLikesForItem(itemId: ObjectId): Promise<Like[]> {
+    await connectToDatabase();
+    
+    if (!collections.likes) {
+        throw new Error("Likes collection not initialized");
+    }
+
+    const likes = await collections.likes
+        .find({ item_oid: itemId })
+        .toArray();
+
+    console.log(`✅ Fetched ${likes.length} likes for item ${itemId}`);
+    
+    return likes as Like[];
+}
