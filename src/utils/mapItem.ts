@@ -17,6 +17,11 @@ export interface RawBaroItemData {
  * Combines all platform offering dates into a single sorted array
  */
 export function mapRawItemToBaroItem(rawData: any): Item {
+    const offeringDates = Array.isArray(rawData?.OfferingDates) ? rawData.OfferingDates : [];
+    const pcOfferingDates = Array.isArray(rawData?.PcOfferingDates) ? rawData.PcOfferingDates : [];
+    const combinedOfferingDates = Array.from(
+        new Set([...offeringDates, ...pcOfferingDates])
+    ).sort();
 
     return new Item(
         rawData.Name,
@@ -25,7 +30,7 @@ export function mapRawItemToBaroItem(rawData: any): Item {
         rawData.CreditCost,
         rawData.DucatCost,
         rawData.Type,
-        rawData.OfferingDates,
+        combinedOfferingDates,
         [], // Initial empty likes array
         []  // Initial empty reviews array
     );
