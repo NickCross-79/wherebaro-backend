@@ -6,8 +6,8 @@ export async function marketDataIngestScheduled(myTimer: Timer, context: Invocat
   context.log(`Daily market data ingest started at ${new Date().toISOString()}`);
 
   try {
-    //await connectToDatabase();
-    //await fetchMarketData();
+    await connectToDatabase();
+    await fetchMarketData();
     context.log("Daily market data ingestion completed successfully");
   } catch (error) {
     context.error("Error in daily market data ingest function:", error);
@@ -15,6 +15,6 @@ export async function marketDataIngestScheduled(myTimer: Timer, context: Invocat
 }
 
 app.timer("marketDataIngestScheduled", {
-  schedule: "0 */1 * * * *",
+  schedule: "0 0 20 * * *",
   handler: marketDataIngestScheduled
 });
