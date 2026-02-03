@@ -3,18 +3,18 @@ import { connectToDatabase } from "../../db/database.service.js";
 import { fetchMarketData } from "../../services/marketIngestService.js";
 
 export async function marketDataIngestScheduled(myTimer: Timer, context: InvocationContext): Promise<void> {
-  context.log(`Hourly market data ingest started at ${new Date().toISOString()}`);
+  context.log(`Daily market data ingest started at ${new Date().toISOString()}`);
 
   try {
     await connectToDatabase();
     await fetchMarketData();
-    context.log("Hourly market data ingestion completed successfully");
+    context.log("Daily market data ingestion completed successfully");
   } catch (error) {
-    context.error("Error in hourly market data ingest function:", error);
+    context.error("Error in daily market data ingest function:", error);
   }
 }
 
 app.timer("marketDataIngestScheduled", {
-  schedule: "0 * * * *",
+  schedule: "0 20 * * *",
   handler: marketDataIngestScheduled
 });
