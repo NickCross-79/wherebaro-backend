@@ -1,6 +1,6 @@
-import { collections } from "../db/database.service";
+import { collections } from "../db/database.service.js";
 import * as mongoDB from "mongodb";
-import Market from "../models/Market";
+import Market from "../models/Market.js";
 
 interface MarketDataPoint {
   datetime: string;
