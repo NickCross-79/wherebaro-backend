@@ -9,5 +9,5 @@
     "esModuleInterop": true,
     "skipLibCheck": true
   },
-  "include": ["src/functions/**/*.ts"]
+  "include": ["src/**/*.ts"]
 }
