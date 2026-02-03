@@ -18,6 +18,7 @@ interface WarframeMarketResponse {
         volume: number;
         avg_price: number;
         mod_rank?: number;
+        subtype?: string;
         [key: string]: any;
       }>;
     };
@@ -77,7 +78,7 @@ export async function fetchMarketData(): Promise<void> {
           volume: dataPoint.volume,
           avg_price: dataPoint.avg_price,
           ...(dataPoint.mod_rank !== undefined && { mod_rank: dataPoint.mod_rank }),
-          ...(item.subtype && { subtype: item.subtype })
+          ...(dataPoint.subtype && { subtype: dataPoint.subtype })
         }));
 
         // Upsert market data
