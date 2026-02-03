@@ -15,6 +15,6 @@ export async function marketDataIngestScheduled(myTimer: Timer, context: Invocat
 }
 
 app.timer("marketDataIngestScheduled", {
-  schedule: "*/5 * * * *",
+  schedule: "*/1 * * * *",
   handler: marketDataIngestScheduled
 });
