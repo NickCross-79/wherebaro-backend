@@ -5,6 +5,7 @@
   "scripts": {
     "build": "tsc",
     "prestart": "npm run build",
+    "postinstall": "npm run build",
     "start": "func start",
     "watch": "tsc -w"
   },
