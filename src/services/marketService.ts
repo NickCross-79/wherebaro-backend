@@ -1,6 +1,6 @@
-import { collections, connectToDatabase } from "../db/database.service.js";
+import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
-import Market from "../models/Market.js";
+import Market from "../models/Market";
 
 /**
  * Fetches market data for a specific item

@@ -1,5 +1,5 @@
-import { getLikesForItem } from "../services/likeService.js";
-import Like from "../models/Like.js";
+import { getLikesForItem } from "../services/likeService";
+import Like from "../models/Like";
 import { ObjectId } from "mongodb";
 
 export async function getLikesJob(itemId: string): Promise<Like[]> {

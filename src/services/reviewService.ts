@@ -1,6 +1,6 @@
-import { collections, connectToDatabase } from "../db/database.service.js";
+import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
-import Review from "../models/Review.js";
+import Review from "../models/Review";
 
 /**
  * Fetches all reviews for a specific item

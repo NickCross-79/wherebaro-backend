@@ -1,5 +1,5 @@
 import { app, InvocationContext, Timer } from "@azure/functions";
-import { updateCurrentJob } from "../../jobs/updateCurrent.job.js";
+import { updateCurrentJob } from "../../jobs/updateCurrent.job";
 
 export async function baroVisitUpdate(myTimer: Timer, context: InvocationContext): Promise<void> {
     context.log(`Weekly Baro update started at ${new Date().toISOString()}`);

@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { getReviewsJob } from "../../jobs/getReviews.job.js";
+import { getReviewsJob } from "../../jobs/getReviews.job";
 
 export async function getReviews(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);

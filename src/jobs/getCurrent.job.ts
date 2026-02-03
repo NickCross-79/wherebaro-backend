@@ -1,4 +1,4 @@
-import { fetchCurrent } from "../services/currentService.js";
+import { fetchCurrent } from "../services/currentService";
 
 export async function getCurrentJob() {
     return fetchCurrent();

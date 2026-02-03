@@ -1,5 +1,5 @@
-import { collections, connectToDatabase } from "../db/database.service.js";
-import Item from "../models/Item.js";
+import { collections, connectToDatabase } from "../db/database.service";
+import Item from "../models/Item";
 
 /**
  * Fetches all items from the database

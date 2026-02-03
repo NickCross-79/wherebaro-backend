@@ -1,5 +1,5 @@
-import { getReviewsForItem } from "../services/reviewService.js";
-import Review from "../models/Review.js";
+import { getReviewsForItem } from "../services/reviewService";
+import Review from "../models/Review";
 import { ObjectId } from "mongodb";
 
 export async function getReviewsJob(itemId: string): Promise<Review[]> {

@@ -1,4 +1,4 @@
-import Item from "../models/Item.js";
+import Item from "../models/Item";
 
 export interface RawBaroItemData {
     Name: string;

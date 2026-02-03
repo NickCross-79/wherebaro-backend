@@ -1,6 +1,6 @@
 import { ObjectId } from "mongodb";
-import Like from "../models/Like.js";
-import { addLike, removeLike } from "../services/likeService.js";
+import Like from "../models/Like";
+import { addLike, removeLike } from "../services/likeService";
 
 export interface LikePayload {
     item_oid: string;

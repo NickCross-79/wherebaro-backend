@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { likeJob, LikePayload } from "../../jobs/like.job.js";
+import { likeJob, LikePayload } from "../../jobs/like.job";
 
 export async function likeItem(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);

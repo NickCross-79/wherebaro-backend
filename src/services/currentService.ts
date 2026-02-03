@@ -1,6 +1,6 @@
-import { collections, connectToDatabase } from "../db/database.service.js";
+import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
-import Item from "../models/Item.js";
+import Item from "../models/Item";
 
 export interface CurrentBaroData {
     isActive: boolean;

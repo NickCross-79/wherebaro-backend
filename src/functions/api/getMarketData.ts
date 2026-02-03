@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { getMarketDataJob } from "../../jobs/getMarketData.job.js";
+import { getMarketDataJob } from "../../jobs/getMarketData.job";
 
 export async function getMarketData(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   context.log(`Http function processed request for url "${request.url}"`);

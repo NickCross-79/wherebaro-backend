@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { deleteReviewJob, DeleteReviewPayload } from "../../jobs/deleteReview.job.js";
+import { deleteReviewJob, DeleteReviewPayload } from "../../jobs/deleteReview.job";
 
 export async function deleteReview(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);

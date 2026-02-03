@@ -1,5 +1,5 @@
-import { collections, connectToDatabase } from "../db/database.service.js";
-import Like from "../models/Like.js";
+import { collections, connectToDatabase } from "../db/database.service";
+import Like from "../models/Like";
 import { ObjectId } from "mongodb";
 
 /**

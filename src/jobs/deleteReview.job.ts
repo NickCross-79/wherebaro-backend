@@ -1,4 +1,4 @@
-import { deleteReview } from "../services/reviewService.js";
+import { deleteReview } from "../services/reviewService";
 import { ObjectId } from "mongodb";
 
 export interface DeleteReviewPayload {

@@ -1,5 +1,5 @@
-import { updateReview } from "../services/reviewService.js";
-import Review from "../models/Review.js";
+import { updateReview } from "../services/reviewService";
+import Review from "../models/Review";
 import { ObjectId } from "mongodb";
 
 export interface UpdateReviewPayload {

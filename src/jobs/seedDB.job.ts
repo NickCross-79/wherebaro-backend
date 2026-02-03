@@ -1,6 +1,6 @@
-import { scrape } from "../services/wikiIngestService.js";
-import { mapRawItemToBaroItem } from "../utils/mapItem.js";
-import { insertBaroItems } from "../services/seedDBService.js";
+import { scrape } from "../services/wikiIngestService";
+import { mapRawItemToBaroItem } from "../utils/mapItem";
+import { insertBaroItems } from "../services/seedDBService";
 
 export async function seedDB() {
     console.log("Starting DB seeding process...");

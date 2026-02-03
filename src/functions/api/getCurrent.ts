@@ -1,5 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { getCurrentJob } from "../../jobs/getCurrent.job.js";
+import { getCurrentJob } from "../../jobs/getCurrent.job";
 
 export async function getCurrent(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);
