@@ -5,7 +5,7 @@ import * as dns from 'dns';
 // Configure DNS to use Google/Cloudflare DNS servers
 dns.setServers(['8.8.8.8', '8.8.4.4', '1.1.1.1']);
 
-export const collections: { items?: mongoDB.Collection; current?: mongoDB.Collection; reviews?: mongoDB.Collection; likes?: mongoDB.Collection; markets?: mongoDB.Collection } = {}
+export const collections: { items?: mongoDB.Collection; current?: mongoDB.Collection; reviews?: mongoDB.Collection; likes?: mongoDB.Collection } = {}
 
 export async function connectToDatabase () {
     dotenv.config();
@@ -32,17 +32,14 @@ export async function connectToDatabase () {
     const currentCollection: mongoDB.Collection = db.collection("current");
     const reviewsCollection: mongoDB.Collection = db.collection("reviews");
     const likesCollection: mongoDB.Collection = db.collection("likes");
-    const marketsCollection: mongoDB.Collection = db.collection("markets");
 
     collections.items = itemsCollection;
     collections.current = currentCollection;
     collections.reviews = reviewsCollection;
     collections.likes = likesCollection;
-    collections.markets = marketsCollection;
 
     await reviewsCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
     await likesCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
-    await marketsCollection.createIndex({ item_oid: 1 }, { unique: true });
       
-    console.log(`Successfully connected to database: ${db.databaseName} and collections: ${itemsCollection.collectionName}, ${currentCollection.collectionName}, ${reviewsCollection.collectionName}, ${likesCollection.collectionName}, ${marketsCollection.collectionName}`);
+    console.log(`Successfully connected to database: ${db.databaseName} and collections: ${itemsCollection.collectionName}, ${currentCollection.collectionName}, ${reviewsCollection.collectionName}, ${likesCollection.collectionName}`);
 }
