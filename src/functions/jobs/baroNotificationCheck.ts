@@ -12,8 +12,8 @@ export async function baroNotificationCheck(myTimer: Timer, context: InvocationC
     }
 }
 
-// Run every Friday at 9:00 AM EST (14:00 UTC)
+// Run every Friday at 9:05 AM EST (14:05 UTC)
 app.timer("baroNotificationCheck", {
-    schedule: "0 0 14 * * Fri",
+    schedule: "0 5 14 * * Fri",
     handler: baroNotificationCheck
 });
