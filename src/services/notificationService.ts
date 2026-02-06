@@ -20,9 +20,10 @@ export async function sendPushNotifications(
   try {
     // Get all active push tokens
     const pushTokens = await getActivePushTokens();
+    console.log(`[Notifications] Sending "${title}" to ${pushTokens.length} device(s)`);
 
     if (pushTokens.length === 0) {
-      console.log('No push tokens to send notifications to');
+      console.warn('[Notifications] No active push tokens found — skipping send');
       return { success: 0, failed: 0 };
     }
 
@@ -31,7 +32,7 @@ export async function sendPushNotifications(
     for (const pushToken of pushTokens) {
       // Check that the token is valid
       if (!Expo.isExpoPushToken(pushToken)) {
-        console.error(`Push token ${pushToken} is not a valid Expo push token`);
+        console.error(`[Notifications] Invalid Expo push token: ${pushToken}`);
         await deactivatePushToken(pushToken);
         continue;
       }
@@ -56,7 +57,7 @@ export async function sendPushNotifications(
         const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
         tickets.push(...ticketChunk);
       } catch (error) {
-        console.error('Error sending push notification chunk:', error);
+        console.error('[Notifications] Error sending chunk:', error);
       }
     }
 
@@ -70,14 +71,12 @@ export async function sendPushNotifications(
 
       if (ticket.status === 'error') {
         failedCount++;
-        console.error(`Error sending to ${token}:`, ticket.message);
+        console.error(`[Notifications] Failed for ${token}: ${ticket.message} (${ticket.details?.error})`);
 
-        // Deactivate token if it's invalid
-        if (
-          ticket.details?.error === 'DeviceNotRegistered' ||
-          ticket.details?.error === 'InvalidCredentials'
-        ) {
-          console.log(`Deactivating invalid token: ${token}`);
+        // Only deactivate token if the device itself is unregistered
+        // Don't deactivate for server-side config issues like missing FCM key
+        if (ticket.details?.error === 'DeviceNotRegistered') {
+          console.log(`[Notifications] Deactivating unregistered device: ${token}`);
           await deactivatePushToken(token);
         }
       } else {
@@ -85,11 +84,11 @@ export async function sendPushNotifications(
       }
     }
 
-    console.log(`Push notifications sent: ${successCount} successful, ${failedCount} failed`);
+    console.log(`[Notifications] Result: ${successCount} sent, ${failedCount} failed`);
     return { success: successCount, failed: failedCount };
 
   } catch (error) {
-    console.error('Error in sendPushNotifications:', error);
+    console.error('[Notifications] Error:', error);
     throw error;
   }
 }

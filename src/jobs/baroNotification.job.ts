@@ -1,7 +1,7 @@
 /**
  * Job to check Baro status and send notifications if he has arrived
  */
-import { collections } from '../db/database.service';
+import { collections, connectToDatabase } from '../db/database.service';
 import { sendBaroArrivalNotification } from '../services/notificationService';
 
 interface WarframestatBaroResponse {
@@ -27,7 +27,10 @@ interface BaroStatus {
  */
 export async function checkBaroStatusAndNotify(): Promise<{ statusChanged: boolean; notificationsSent: boolean }> {
   try {
+    await connectToDatabase();
+
     // Fetch current Baro status from Warframestat API
+    console.log('[Baro Notification] Checking Baro status...');
     const response = await fetch('https://api.warframestat.us/pc/voidTrader/');
     const baroData = await response.json() as WarframestatBaroResponse;
 
@@ -60,16 +63,16 @@ export async function checkBaroStatusAndNotify(): Promise<{ statusChanged: boole
     const baroJustArrived = isBaroActive && (!lastStatus || !lastStatus.isActive);
 
     if (baroJustArrived) {
-      console.log(`Baro has arrived at ${baroData.location}! Sending notifications...`);
+      console.log(`[Baro Notification] Baro arrived at ${baroData.location}! Sending notifications...`);
       await sendBaroArrivalNotification(baroData.location);
       return { statusChanged: true, notificationsSent: true };
     }
 
-    console.log(`Baro status: ${isBaroActive ? 'Active' : 'Inactive'}. No change detected.`);
+    console.log(`[Baro Notification] Status: ${isBaroActive ? 'Active at ' + baroData.location : 'Inactive'} | Next: ${baroData.activation}`);
     return { statusChanged: false, notificationsSent: false };
 
   } catch (error) {
-    console.error('Error checking Baro status:', error);
+    console.error('[Baro Notification] Error:', error);
     throw error;
   }
 }

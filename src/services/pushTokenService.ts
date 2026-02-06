@@ -1,30 +1,24 @@
 /**
  * Service for managing push notification tokens
  */
-import { collections } from '../db/database.service';
+import { collections, connectToDatabase } from '../db/database.service';
 import { PushToken, CreatePushTokenDto } from '../models/PushToken';
-import { ObjectId } from 'mongodb';
 
 /**
  * Register or update a push token
  */
 export async function registerPushToken(data: CreatePushTokenDto): Promise<PushToken> {
+  await connectToDatabase();
   const now = new Date();
 
-  // Check if token exists
   const existing = await collections.pushTokens?.findOne({ token: data.token });
 
   if (existing) {
-    // Update existing token
     await collections.pushTokens?.updateOne(
       { token: data.token },
-      { 
-        $set: { 
-          lastUsed: now, 
-          isActive: true 
-        } 
-      }
+      { $set: { lastUsed: now, isActive: true } }
     );
+    console.log(`[Push Tokens] Updated existing token for device ${data.deviceId || 'unknown'}`);
     
     return {
       id: existing._id.toString(),
@@ -36,7 +30,6 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
     };
   }
 
-  // Insert new token
   const newToken = {
     token: data.token,
     deviceId: data.deviceId,
@@ -46,6 +39,7 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
   };
 
   const result = await collections.pushTokens?.insertOne(newToken);
+  console.log(`[Push Tokens] Registered new token for device ${data.deviceId || 'unknown'}`);
 
   return {
     id: result?.insertedId.toString(),
@@ -57,6 +51,7 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
  * Get all active push tokens
  */
 export async function getActivePushTokens(): Promise<string[]> {
+  await connectToDatabase();
   const tokens = await collections.pushTokens?.find({ isActive: true }).toArray();
   return tokens?.map(t => t.token) || [];
 }
@@ -65,23 +60,28 @@ export async function getActivePushTokens(): Promise<string[]> {
  * Deactivate a push token (mark as invalid/expired)
  */
 export async function deactivatePushToken(token: string): Promise<void> {
+  await connectToDatabase();
   await collections.pushTokens?.updateOne(
     { token },
     { $set: { isActive: false } }
   );
+  console.log(`[Push Tokens] Deactivated token: ${token.substring(0, 20)}...`);
 }
 
 /**
  * Remove a push token
  */
 export async function removePushToken(token: string): Promise<void> {
+  await connectToDatabase();
   await collections.pushTokens?.deleteOne({ token });
+  console.log(`[Push Tokens] Removed token: ${token.substring(0, 20)}...`);
 }
 
 /**
  * Clean up old inactive tokens (older than 90 days)
  */
 export async function cleanupInactiveTokens(): Promise<number> {
+  await connectToDatabase();
   const ninetyDaysAgo = new Date();
   ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
 

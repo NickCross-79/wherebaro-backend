@@ -13,7 +13,11 @@ export const collections: {
   pushTokens?: mongoDB.Collection;
 } = {}
 
+let isConnected = false;
+
 export async function connectToDatabase () {
+    if (isConnected) return;
+
     dotenv.config();
 
     const uri = process.env.MONGODB_URI;
@@ -21,6 +25,8 @@ export async function connectToDatabase () {
     if (!uri) {
         throw new Error("Error reading environment variable");
     }
+
+    console.log('[DB] Connecting to MongoDB...');
 
     const client = new mongoDB.MongoClient(uri, {
     serverApi: {
@@ -50,6 +56,7 @@ export async function connectToDatabase () {
     await likesCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
     await pushTokensCollection.createIndex({ token: 1 }, { unique: true });
     await pushTokensCollection.createIndex({ isActive: 1 });
-      
-    console.log(`Successfully connected to database: ${db.databaseName} and collections: ${itemsCollection.collectionName}, ${currentCollection.collectionName}, ${reviewsCollection.collectionName}, ${likesCollection.collectionName}, ${pushTokensCollection.collectionName}`);
+
+    isConnected = true;
+    console.log(`[DB] Connected to database: ${db.databaseName} (collections: items, current, reviews, likes, pushTokens)`);
 }
