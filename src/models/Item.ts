@@ -10,6 +10,7 @@ export default class Item {
         public type: string, 
         public offeringDates: string[],
         public likes: string[],
-        public reviews: string[]
+        public reviews: string[],
+        public uniqueName?: string
     ) {}
 }

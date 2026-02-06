@@ -1,6 +1,8 @@
 import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
 import Item from "../models/Item";
+import Items from "@wfcd/items";
+import { isIgnoredBaroItem } from "../utils/itemMappings";
 
 export interface CurrentBaroData {
     isActive: boolean;
@@ -11,8 +13,10 @@ export interface CurrentBaroData {
 }
 
 const BARO_API_URL = "https://api.warframestat.us/pc/voidTrader/";
+const WF_CDN_BASE = "https://cdn.warframestat.us/img";
 
 interface BaroApiInventoryItem {
+    uniqueName: string;
     item: string;
     ducats: number;
     credits: number;
@@ -23,6 +27,36 @@ interface BaroApiResponse {
     expiry: string;
     location: string;
     inventory: BaroApiInventoryItem[];
+}
+
+interface WfcdItem {
+    name: string;
+    uniqueName: string;
+    imageName?: string;
+    type?: string;
+    category?: string;
+    description?: string;
+}
+
+/**
+ * Extracts the last segment from a uniqueName path.
+ * e.g. "/Lotus/StoreItems/Types/Items/ShipDecos/Foo" -> "Foo"
+ */
+function getUniqueNameSuffix(uniqueName: string): string {
+    const parts = uniqueName.split("/");
+    return parts[parts.length - 1];
+}
+
+/**
+ * Looks up a Warframe item by the last segment of its uniqueName
+ * using the @wfcd/items library.
+ */
+function lookupWfcdItem(uniqueNameSuffix: string): WfcdItem | null {
+    const items = new Items();
+    const results = (items as any[]).filter(
+        (item: WfcdItem) => item.uniqueName && item.uniqueName.endsWith(`/${uniqueNameSuffix}`)
+    );
+    return results.length > 0 ? results[0] : null;
 }
 
 /**
@@ -113,44 +147,99 @@ async function fetchBaroDataFromApi(): Promise<BaroApiResponse> {
     return baroData;
 }
 
-async function insertNewItemIfMissing(itemName: string, itemData: BaroApiInventoryItem, today: string): Promise<void> {
+/**
+ * Resolves a Baro API inventory item to an existing DB item, or creates a new one.
+ * Uses uniqueName suffix matching against the items collection.
+ * Falls back to the @wfcd/items library for name, type, and image of new items.
+ */
+async function resolveOrInsertItem(
+    entry: BaroApiInventoryItem,
+    today: string,
+    isFirstItem: boolean = false
+): Promise<ObjectId | null> {
     if (!collections.items) {
         throw new Error("Items collection not initialized");
     }
 
-    const existingItem = await collections.items.findOne({ name: itemName });
+    const suffix = getUniqueNameSuffix(entry.uniqueName);
 
-    if (!existingItem) {
+    // Try to find item in DB by uniqueName (regex match on suffix)
+    const existingItem = await collections.items.findOne({
+        uniqueName: { $regex: new RegExp(`/${suffix}$`) }
+    });
+
+    if (existingItem) {
+        // Update offering date
+        await collections.items.updateOne(
+            { _id: existingItem._id },
+            { $addToSet: { offeringDates: today } }
+        );
+        return existingItem._id;
+    }
+
+    // Item not in DB — look it up in @wfcd/items for proper metadata
+    const wfcdItem = lookupWfcdItem(suffix);
+
+    if (wfcdItem) {
+        const imageUrl = wfcdItem.imageName
+            ? `${WF_CDN_BASE}/${wfcdItem.imageName}`
+            : "";
+
         const newItem = new Item(
-            itemName,
-            "",
-            "",
-            itemData?.credits ?? 0,
-            itemData?.ducats ?? 0,
-            "Unknown",
+            wfcdItem.name,
+            imageUrl,
+            "",  // link — wiki page won't exist yet for brand-new items
+            entry.credits ?? 0,
+            entry.ducats ?? 0,
+            wfcdItem.type || wfcdItem.category || "Unknown",
             [today],
             [],
-            []
+            [],
+            wfcdItem.uniqueName
         );
 
-        await collections.items.insertOne(newItem as unknown as Item);
+        const result = await collections.items.insertOne(newItem as any);
+        console.log(`[Baro Update] Inserted new item: "${wfcdItem.name}" (uniqueName: ${wfcdItem.uniqueName})`);
+        return result.insertedId;
     }
+
+    // Item not found in DB or wfcd library — log to unknownItems collection
+    console.warn(`[Baro Update] Unknown item: "${entry.item}" (uniqueName: ${entry.uniqueName}, suffix: ${suffix})`);
+    await logUnknownItem(entry, isFirstItem);
+    return null;
 }
 
-async function matchInventoryToItemIds(inventoryNames: string[]): Promise<ObjectId[]> {
-    if (!collections.items) {
-        throw new Error("Items collection not initialized");
+/**
+ * Logs an unresolved inventory item to the unknownItems collection for manual review.
+ */
+async function logUnknownItem(entry: BaroApiInventoryItem, isFirstItem: boolean): Promise<void> {
+    if (!collections.unknownItems) {
+        console.warn(`[Baro Update] unknownItems collection not available, skipping log for "${entry.item}"`);
+        return;
     }
 
-    const matchedItems = await collections.items
-        .find({ name: { $in: inventoryNames } })
-        .toArray();
-
-    const itemIdByName = new Map(matchedItems.map((item: any) => [item.name, item._id]));
-
-    return inventoryNames
-        .map((name) => itemIdByName.get(name))
-        .filter((id): id is ObjectId => Boolean(id));
+    try {
+        await collections.unknownItems.updateOne(
+            { uniqueName: entry.uniqueName },
+            {
+                $set: {
+                    apiItemName: entry.item,
+                    uniqueName: entry.uniqueName,
+                    ducats: entry.ducats,
+                    credits: entry.credits,
+                    isNewItem: isFirstItem,
+                    lastSeen: new Date().toISOString(),
+                },
+                $setOnInsert: {
+                    firstSeen: new Date().toISOString(),
+                }
+            },
+            { upsert: true }
+        );
+        console.log(`[Baro Update] Logged unknown item to DB: "${entry.item}"${isFirstItem ? " (NEW ITEM)" : ""}`);
+    } catch (error) {
+        console.error(`[Baro Update] Failed to log unknown item "${entry.item}":`, error);
+    }
 }
 
 async function updateCurrentCollection(baroData: BaroApiResponse, inventoryIds: ObjectId[]): Promise<void> {
@@ -174,20 +263,10 @@ async function updateCurrentCollection(baroData: BaroApiResponse, inventoryIds: 
     );
 }
 
-async function updateOfferingDates(inventoryNames: string[], today: string): Promise<void> {
-    if (!collections.items) {
-        throw new Error("Items collection not initialized");
-    }
-
-    await collections.items.updateMany(
-        { name: { $in: inventoryNames } },
-        { $addToSet: { offeringDates: today } }
-    );
-}
-
 /**
- * Updates the current Baro data from the external API
- * @returns Object with update status and details
+ * Updates the current Baro data from the external API.
+ * Matches inventory items to the DB using uniqueName suffix matching.
+ * New items are resolved via @wfcd/items for proper name, type, and image.
  */
 export async function updateCurrentFromApi() {
     const baroData = await fetchBaroDataFromApi();
@@ -205,33 +284,52 @@ export async function updateCurrentFromApi() {
         throw new Error("Database collections not initialized");
     }
 
-    const inventoryNames = baroData.inventory
-        .map((entry) => entry.item)
-        .filter((name) => Boolean(name));
-
-    if (inventoryNames.length === 0) {
-        return { updated: false, reason: "No inventory names found" };
+    if (baroData.inventory.length === 0) {
+        return { updated: false, reason: "No inventory items found" };
     }
 
     const today = now.toISOString().split("T")[0];
 
-    // Insert newest item if it doesn't exist
-    const newestItemName = inventoryNames[0];
-    const newestItemData = baroData.inventory[0];
-    await insertNewItemIfMissing(newestItemName, newestItemData, today);
+    // Resolve each inventory item to a DB item ID (insert new ones as needed)
+    const inventoryIds: ObjectId[] = [];
+    const unmatchedItems: string[] = [];
+    const ignoredItems: string[] = [];
 
-    // Match inventory names to item IDs
-    const inventoryIds = await matchInventoryToItemIds(inventoryNames);
+    for (let i = 0; i < baroData.inventory.length; i++) {
+        const entry = baroData.inventory[i];
+        const isFirstItem = i === 0;
+
+        // Skip ignored items (Void Surplus, Mod Packs, etc.)
+        if (isIgnoredBaroItem(entry.item)) {
+            ignoredItems.push(entry.item);
+            continue;
+        }
+
+        const itemId = await resolveOrInsertItem(entry, today, isFirstItem);
+        if (itemId) {
+            inventoryIds.push(itemId);
+        } else {
+            unmatchedItems.push(entry.item);
+        }
+    }
+
+    if (ignoredItems.length > 0) {
+        console.log(`[Baro Update] Ignored ${ignoredItems.length} items: ${ignoredItems.join(", ")}`);
+    }
 
     // Update the current collection
     await updateCurrentCollection(baroData, inventoryIds);
 
-    // Update offering dates for all items in inventory
-    await updateOfferingDates(inventoryNames, today);
+    console.log(`[Baro Update] Matched ${inventoryIds.length}/${baroData.inventory.length} items`);
+    if (unmatchedItems.length > 0) {
+        console.warn(`[Baro Update] Unmatched items: ${unmatchedItems.join(", ")}`);
+    }
 
     return {
         updated: true,
         inventoryCount: inventoryIds.length,
+        totalApiItems: baroData.inventory.length,
+        unmatchedItems,
         activation: baroData.activation,
         expiry: baroData.expiry
     };

@@ -13,6 +13,7 @@
     "@azure/cosmos": "^4.9.0",
     "@azure/functions": "^4.5.0",
     "@azure/identity": "^4.13.0",
+    "@wfcd/items": "^1.1272.112",
     "cheerio": "^1.2.0",
     "dotenv": "^17.2.3",
     "expo-server-sdk": "^5.0.0",
