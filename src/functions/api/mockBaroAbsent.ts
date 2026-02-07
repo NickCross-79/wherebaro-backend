@@ -15,8 +15,8 @@ import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/fu
  */
 export async function mockBaroAbsent(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     // Hardcoded: Baro arrives at 3:40 PM EST (8:40 PM UTC) on Feb 7, 2026
-    const activation = "2026-02-07T20:40:00.000Z";
-    const expiry = "2026-02-09T20:40:00.000Z"; // 48h after activation
+    const activation = "2026-02-07T21:00:00.000Z";
+    const expiry = "2026-02-09T21:00:00.000Z"; // 48h after activation
 
     const response = {
         id: "5d1e07a0a38e4a4fdd7cefca",
