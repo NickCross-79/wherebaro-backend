@@ -12,8 +12,8 @@ export async function baroVisitUpdate(myTimer: Timer, context: InvocationContext
     }
 }
 
-// Run every Friday at 9:01 AM EST (14:01 UTC)
+// Run every Friday at 9:00:10 AM EST (14:00:10 UTC)
 app.timer("baroVisitUpdate", {
-    schedule: "0 1 14 * * Fri",
+    schedule: "10 0 14 * * Fri",
     handler: baroVisitUpdate
 });
