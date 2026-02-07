@@ -14,6 +14,7 @@ export const collections: {
   unknownItems?: mongoDB.Collection;
 } = {}
 
+export let db: mongoDB.Db;
 let isConnected = false;
 
 export async function connectToDatabase () {
@@ -39,7 +40,7 @@ export async function connectToDatabase () {
 
     await client.connect();
         
-    const db: mongoDB.Db = client.db("wherebaro");
+    db = client.db("wherebaro");
   
     const itemsCollection: mongoDB.Collection = db.collection("items");
     const currentCollection: mongoDB.Collection = db.collection("current");
