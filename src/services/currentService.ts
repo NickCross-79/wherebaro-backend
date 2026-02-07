@@ -116,7 +116,7 @@ export async function fetchCurrent(): Promise<CurrentBaroData> {
 
     // Baro is not active or no inventory
     return {
-        isActive: false,
+        isActive: currentRecord.isActive || false,
         activation: currentRecord.activation,
         expiry: currentRecord.expiry,
         location: currentRecord.location,
@@ -251,7 +251,6 @@ async function updateCurrentCollection(baroData: BaroApiResponse, inventoryIds: 
         {},
         {
             $set: {
-                isHere: true,
                 isActive: true,
                 activation: baroData.activation,
                 expiry: baroData.expiry,
