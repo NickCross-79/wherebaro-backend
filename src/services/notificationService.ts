@@ -143,15 +143,13 @@ export async function sendWishlistMatchNotification(
       return { success: false };
     }
 
-    const itemList = itemNames.length === 1
-      ? itemNames[0]
-      : itemNames.slice(0, -1).join(', ') + ' and ' + itemNames[itemNames.length - 1];
-
     const title = itemNames.length === 1
-      ? `${itemNames[0]} is available!`
-      : `${itemNames.length} wishlist items available!`;
+      ? 'Baro brought an item on your wishlist!'
+      : `Baro brought ${itemNames.length} items on your wishlist!`;
 
-    const body = `Baro brought ${itemList} — grab ${itemNames.length === 1 ? 'it' : 'them'} before he leaves!`;
+    const body = itemNames.length === 1
+      ? 'Grab it before he leaves!'
+      : 'Grab them before he leaves!';
 
     const message: ExpoPushMessage = {
       to: pushToken,
