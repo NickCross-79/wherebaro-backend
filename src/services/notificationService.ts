@@ -125,3 +125,57 @@ export async function sendBaroDepartureNotification(): Promise<void> {
     { type: 'baro-departure' }
   );
 }
+
+/**
+ * Send a targeted wishlist notification to a specific push token.
+ * Tells the user which of their wishlisted items Baro brought.
+ * @param pushToken - The Expo push token to send to
+ * @param itemNames - The item names that matched their wishlist
+ */
+export async function sendWishlistMatchNotification(
+  pushToken: string,
+  itemNames: string[]
+): Promise<{ success: boolean }> {
+  try {
+    if (!Expo.isExpoPushToken(pushToken)) {
+      console.error(`[Notifications] Invalid Expo push token: ${pushToken}`);
+      await deactivatePushToken(pushToken);
+      return { success: false };
+    }
+
+    const itemList = itemNames.length === 1
+      ? itemNames[0]
+      : itemNames.slice(0, -1).join(', ') + ' and ' + itemNames[itemNames.length - 1];
+
+    const title = itemNames.length === 1
+      ? `${itemNames[0]} is available!`
+      : `${itemNames.length} wishlist items available!`;
+
+    const body = `Baro brought ${itemList} — grab ${itemNames.length === 1 ? 'it' : 'them'} before he leaves!`;
+
+    const message: ExpoPushMessage = {
+      to: pushToken,
+      sound: 'default',
+      title,
+      body,
+      data: { type: 'wishlist-match', items: itemNames },
+      priority: 'high',
+      channelId: 'baro-alerts',
+    };
+
+    const [ticket] = await expo.sendPushNotificationsAsync([message]);
+
+    if (ticket.status === 'error') {
+      console.error(`[Notifications] Wishlist notification failed for ${pushToken}: ${ticket.message}`);
+      if (ticket.details?.error === 'DeviceNotRegistered') {
+        await deactivatePushToken(pushToken);
+      }
+      return { success: false };
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error(`[Notifications] Error sending wishlist notification:`, error);
+    return { success: false };
+  }
+}

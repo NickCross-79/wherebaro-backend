@@ -2,7 +2,8 @@
  * Jobs to send Baro arrival and departure notifications.
  * Purely API-driven — no database state needed.
  */
-import { sendBaroArrivalNotification, sendBaroDepartingSoonNotification, sendBaroDepartureNotification } from '../services/notificationService';
+import { sendBaroArrivalNotification, sendBaroDepartingSoonNotification, sendBaroDepartureNotification, sendWishlistMatchNotification } from '../services/notificationService';
+import { getWishlistMatchesForCurrentInventory } from '../services/wishlistService';
 
 const BARO_API_URL = 'https://api.warframestat.us/pc/voidTrader/';
 
@@ -41,6 +42,21 @@ export async function checkBaroArrival(): Promise<{ notificationSent: boolean }>
     if (isActive) {
       console.log(`[Baro Arrival] Baro is here at ${baroData.location}! Sending notification...`);
       await sendBaroArrivalNotification(baroData.location);
+
+      // Send targeted wishlist notifications
+      try {
+        const wishlistMatches = await getWishlistMatchesForCurrentInventory();
+        let wishlistSent = 0;
+        for (const [token, itemNames] of wishlistMatches) {
+          const result = await sendWishlistMatchNotification(token, itemNames);
+          if (result.success) wishlistSent++;
+        }
+        console.log(`[Baro Arrival] Sent ${wishlistSent} wishlist notification(s)`);
+      } catch (wishlistError) {
+        // Don't let wishlist errors block the main arrival notification
+        console.error('[Baro Arrival] Error sending wishlist notifications:', wishlistError);
+      }
+
       return { notificationSent: true };
     }
 

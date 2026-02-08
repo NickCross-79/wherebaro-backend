@@ -11,6 +11,7 @@ export default class Item {
         public offeringDates: string[],
         public likes: string[],
         public reviews: string[],
-        public uniqueName?: string
+        public uniqueName?: string,
+        public wishlistPushTokens?: string[]
     ) {}
 }
