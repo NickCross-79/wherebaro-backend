@@ -6,19 +6,19 @@ import { checkBaroDepartingSoon } from "../../jobs/baroNotification.job";
  * Baro typically leaves Sunday around 9 AM EST, so this gives users
  * a ~3-hour heads-up that he's about to leave.
  */
-export async function baroDepartingSoonNotification(myTimer: Timer, context: InvocationContext): Promise<void> {
-    context.log(`Baro departing soon notification check started at ${new Date().toISOString()}`);
+export async function baroDepartingSoonCheck(myTimer: Timer, context: InvocationContext): Promise<void> {
+    context.log(`Baro departing soon check started at ${new Date().toISOString()}`);
 
     try {
         const result = await checkBaroDepartingSoon();
-        context.log(`Baro departing soon notification result:`, result);
+        context.log(`Baro departing soon check result:`, result);
     } catch (error) {
-        context.error(`Baro departing soon notification failed: ${error}`);
+        context.error(`Baro departing soon check failed: ${error}`);
     }
 }
 
 // Every Sunday at 6:00 AM EST = 11:00 UTC
-app.timer("baroDepartingSoonNotification", {
+app.timer("baroDepartingSoonCheck", {
     schedule: "0 0 11 * * Sun",
-    handler: baroDepartingSoonNotification
+    handler: baroDepartingSoonCheck
 });
