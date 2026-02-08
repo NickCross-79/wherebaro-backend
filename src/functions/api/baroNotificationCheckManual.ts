@@ -1,11 +1,28 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { checkBaroStatusAndNotify } from "../../jobs/baroNotification.job";
+import { checkBaroArrival, checkBaroDepartingSoon, checkBaroDeparture } from "../../jobs/baroNotification.job";
 
 export async function baroNotificationCheckManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);
 
     try {
-        const result = await checkBaroStatusAndNotify();
+        // Query param "type" controls which notification check to run:
+        //   "arrival"       - checks if Baro has arrived and sends arrival notification
+        //   "departingSoon" - checks if Baro is leaving within 3 hours and sends warning
+        //   "departure"     - checks if Baro just left and sends departure notification
+        //   "all" (default) - runs all three checks
+        const type = request.query.get("type") || "all";
+
+        let result: Record<string, any> = {};
+
+        if (type === "arrival" || type === "all") {
+            result.arrival = await checkBaroArrival();
+        }
+        if (type === "departingSoon" || type === "all") {
+            result.departingSoon = await checkBaroDepartingSoon();
+        }
+        if (type === "departure" || type === "all") {
+            result.departure = await checkBaroDeparture();
+        }
 
         return {
             status: 200,
@@ -13,7 +30,7 @@ export async function baroNotificationCheckManualHttp(request: HttpRequest, cont
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*"
             },
-            body: JSON.stringify({ message: "Baro notification check completed", result })
+            body: JSON.stringify({ message: "Baro notification check completed", type, result })
         };
     } catch (error) {
         context.error("Error in Baro notification check http function:", error);

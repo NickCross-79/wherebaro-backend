@@ -98,19 +98,30 @@ export async function sendPushNotifications(
  */
 export async function sendBaroArrivalNotification(location: string): Promise<void> {
   await sendPushNotifications(
-    'Baro Ki\'Teer has arrived! 🎭',
+    'Baro Ki\'Teer has arrived!',
     `Visit him at ${location}`,
     { type: 'baro-arrival', location }
   );
 }
 
 /**
- * Send Baro leaving soon notification
+ * Send Baro departing soon notification
  */
-export async function sendBaroLeavingSoonNotification(hoursRemaining: number): Promise<void> {
+export async function sendBaroDepartingSoonNotification(hoursRemaining: number): Promise<void> {
   await sendPushNotifications(
-    'Baro is leaving soon! ⏰',
+    'Baro is leaving soon!',
     `Only ${hoursRemaining} hours remaining to visit Baro Ki'Teer`,
     { type: 'baro-leaving-soon', hoursRemaining }
+  );
+}
+
+/**
+ * Send Baro departure notification
+ */
+export async function sendBaroDepartureNotification(): Promise<void> {
+  await sendPushNotifications(
+    'Baro Ki\'Teer has departed',
+    'Baro has left the relay. See you next time, Tenno!',
+    { type: 'baro-departure' }
   );
 }

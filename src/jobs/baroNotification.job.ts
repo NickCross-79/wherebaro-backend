@@ -1,8 +1,10 @@
 /**
- * Job to check Baro status and send notifications if he has arrived
+ * Jobs to send Baro arrival and departure notifications.
+ * Purely API-driven — no database state needed.
  */
-import { collections, connectToDatabase } from '../db/database.service';
-import { sendBaroArrivalNotification, sendBaroLeavingSoonNotification } from '../services/notificationService';
+import { sendBaroArrivalNotification, sendBaroDepartingSoonNotification, sendBaroDepartureNotification } from '../services/notificationService';
+
+const BARO_API_URL = 'https://api.warframestat.us/pc/voidTrader/';
 
 interface WarframestatBaroResponse {
   id: string;
@@ -14,90 +16,111 @@ interface WarframestatBaroResponse {
   active: boolean;
 }
 
-interface BaroStatus {
-  isActive: boolean;
-  location: string;
-  activation: string;
-  expiry: string;
-  lastChecked: Date;
-  departureWarningSent?: boolean;
+/**
+ * Fetch Baro data from the Warframestat API
+ */
+async function fetchBaroData(): Promise<WarframestatBaroResponse> {
+  const response = await fetch(BARO_API_URL);
+  return response.json() as Promise<WarframestatBaroResponse>;
 }
 
 /**
- * Check if Baro status has changed and send notifications
+ * Called on Friday when Baro is expected to arrive.
+ * Checks if he's currently active and sends an arrival notification.
  */
-export async function checkBaroStatusAndNotify(): Promise<{ statusChanged: boolean; notificationsSent: boolean }> {
+export async function checkBaroArrival(): Promise<{ notificationSent: boolean }> {
   try {
-    await connectToDatabase();
-
-    // Fetch current Baro status from Warframestat API
-    console.log('[Baro Notification] Checking Baro status...');
-    const response = await fetch('https://api.warframestat.us/pc/voidTrader/');
-    const baroData = await response.json() as WarframestatBaroResponse;
+    console.log('[Baro Arrival] Checking Baro status...');
+    const baroData = await fetchBaroData();
 
     const now = new Date();
     const activation = new Date(baroData.activation);
     const expiry = new Date(baroData.expiry);
-    
-    // Determine if Baro is currently active
-    const isBaroActive = now >= activation && now < expiry;
+    const isActive = now >= activation && now < expiry;
 
-    // Get last known status from database
-    const lastStatus = await collections.current?.findOne({ type: 'baro-notification-status' }) as BaroStatus | null;
-
-    const currentStatus: BaroStatus = {
-      isActive: isBaroActive,
-      location: baroData.location,
-      activation: baroData.activation,
-      expiry: baroData.expiry,
-      lastChecked: now,
-    };
-
-    // Update status in database
-    await collections.current?.updateOne(
-      { type: 'baro-notification-status' },
-      { $set: currentStatus },
-      { upsert: true }
-    );
-
-    // Reset departure warning flag when Baro leaves
-    if (!isBaroActive && lastStatus?.departureWarningSent) {
-      await collections.current?.updateOne(
-        { type: 'baro-notification-status' },
-        { $set: { departureWarningSent: false } }
-      );
-    }
-
-    // Check if Baro just arrived (wasn't active before, but is now)
-    const baroJustArrived = isBaroActive && (!lastStatus || !lastStatus.isActive);
-
-    if (baroJustArrived) {
-      console.log(`[Baro Notification] Baro arrived at ${baroData.location}! Sending notifications...`);
+    if (isActive) {
+      console.log(`[Baro Arrival] Baro is here at ${baroData.location}! Sending notification...`);
       await sendBaroArrivalNotification(baroData.location);
-      return { statusChanged: true, notificationsSent: true };
+      return { notificationSent: true };
     }
 
-    // Check if Baro is leaving within 3 hours and we haven't warned yet
-    const DEPARTURE_WARNING_MS = 3 * 60 * 60 * 1000; // 3 hours
-    const msUntilExpiry = expiry.getTime() - now.getTime();
-    const isDepartingSoon = isBaroActive && msUntilExpiry > 0 && msUntilExpiry <= DEPARTURE_WARNING_MS;
-
-    if (isDepartingSoon && !lastStatus?.departureWarningSent) {
-      const hoursLeft = Math.round(msUntilExpiry / (60 * 60 * 1000));
-      console.log(`[Baro Notification] Baro leaving in ~${hoursLeft}h — sending departure warning...`);
-      await sendBaroLeavingSoonNotification(hoursLeft || 1);
-      await collections.current?.updateOne(
-        { type: 'baro-notification-status' },
-        { $set: { departureWarningSent: true } }
-      );
-      return { statusChanged: false, notificationsSent: true };
-    }
-
-    console.log(`[Baro Notification] Status: ${isBaroActive ? 'Active at ' + baroData.location : 'Inactive'} | Next: ${baroData.activation}`);
-    return { statusChanged: false, notificationsSent: false };
+    console.log(`[Baro Arrival] Baro is not active. Next arrival: ${baroData.activation}`);
+    return { notificationSent: false };
 
   } catch (error) {
-    console.error('[Baro Notification] Error:', error);
+    console.error('[Baro Arrival] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Called on Sunday morning before Baro leaves.
+ * Checks if he's still active and sends a departing soon warning.
+ */
+export async function checkBaroDepartingSoon(): Promise<{ notificationSent: boolean }> {
+  try {
+    console.log('[Baro Departing Soon] Checking Baro status...');
+    const baroData = await fetchBaroData();
+
+    const now = new Date();
+    const activation = new Date(baroData.activation);
+    const expiry = new Date(baroData.expiry);
+    const isActive = now >= activation && now < expiry;
+
+    if (isActive) {
+      const msUntilExpiry = expiry.getTime() - now.getTime();
+      const hoursLeft = Math.round(msUntilExpiry / (60 * 60 * 1000)) || 1;
+      console.log(`[Baro Departing Soon] Baro leaving in ~${hoursLeft}h — sending warning...`);
+      await sendBaroDepartingSoonNotification(hoursLeft);
+      return { notificationSent: true };
+    }
+
+    console.log(`[Baro Departing Soon] Baro is not active — no warning needed.`);
+    return { notificationSent: false };
+
+  } catch (error) {
+    console.error('[Baro Departing Soon] Error:', error);
+    throw error;
+  }
+}
+
+/**
+ * Called on Sunday at 9 AM EST after Baro typically leaves.
+ * If Baro is no longer active and his next activation is NOT the following
+ * Friday (i.e. it's ~2 weeks out), that means he was here this weekend
+ * and just departed.
+ */
+export async function checkBaroDeparture(): Promise<{ notificationSent: boolean }> {
+  try {
+    console.log('[Baro Departure] Checking if Baro just left...');
+    const baroData = await fetchBaroData();
+
+    const now = new Date();
+    const activation = new Date(baroData.activation);
+    const expiry = new Date(baroData.expiry);
+    const isActive = now >= activation && now < expiry;
+
+    if (isActive) {
+      console.log('[Baro Departure] Baro is still active — has not departed yet.');
+      return { notificationSent: false };
+    }
+
+    // If next activation is more than 7 days away, Baro was just here
+    // and left (biweekly cycle). If it's within 7 days, he's arriving
+    // soon and wasn't here this weekend.
+    const daysUntilNextArrival = (activation.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+
+    if (daysUntilNextArrival > 7) {
+      console.log(`[Baro Departure] Baro just left! Next arrival in ${Math.round(daysUntilNextArrival)} days. Sending notification...`);
+      await sendBaroDepartureNotification();
+      return { notificationSent: true };
+    }
+
+    console.log(`[Baro Departure] Baro wasn't here this weekend. Next arrival in ${Math.round(daysUntilNextArrival)} days.`);
+    return { notificationSent: false };
+
+  } catch (error) {
+    console.error('[Baro Departure] Error:', error);
     throw error;
   }
 }

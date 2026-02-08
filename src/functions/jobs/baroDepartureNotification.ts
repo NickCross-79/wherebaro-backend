@@ -1,24 +1,23 @@
 import { app, InvocationContext, Timer } from "@azure/functions";
-import { checkBaroStatusAndNotify } from "../../jobs/baroNotification.job";
+import { checkBaroDeparture } from "../../jobs/baroNotification.job";
 
 /**
- * Sunday morning Baro departure check — fires at 6 AM EST (11:00 UTC).
- * Baro typically leaves Sunday around 9 AM EST, so this gives users
- * a ~3-hour heads-up that he's about to leave.
+ * Sunday 9 AM EST (14:00 UTC) — right when Baro typically leaves.
+ * Checks if he was here this weekend and just departed.
  */
 export async function baroDepartureNotification(myTimer: Timer, context: InvocationContext): Promise<void> {
     context.log(`Baro departure notification check started at ${new Date().toISOString()}`);
 
     try {
-        const result = await checkBaroStatusAndNotify();
-        context.log(`Baro departure notification check result:`, result);
+        const result = await checkBaroDeparture();
+        context.log(`Baro departure notification result:`, result);
     } catch (error) {
-        context.error(`Baro departure notification check failed: ${error}`);
+        context.error(`Baro departure notification failed: ${error}`);
     }
 }
 
-// Every Sunday at 6:00 AM EST = 11:00 UTC
+// Every Sunday at 9:00 AM EST = 14:00 UTC
 app.timer("baroDepartureNotification", {
-    schedule: "0 0 11 * * Sun",
+    schedule: "10 0 14 * * Sun",
     handler: baroDepartureNotification
 });
