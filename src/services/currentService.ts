@@ -140,8 +140,13 @@ async function fetchBaroDataFromApi(): Promise<BaroApiResponse> {
     const data = await response.json();
     const baroData: BaroApiResponse | undefined = Array.isArray(data) ? data[0] : data;
 
-    if (!baroData || !baroData.inventory || baroData.inventory.length === 0) {
-        throw new Error("Invalid or empty Baro data received from API");
+    if (!baroData) {
+        throw new Error("Invalid Baro data received from API");
+    }
+
+    // Ensure inventory is always an array (empty when Baro is absent)
+    if (!baroData.inventory) {
+        baroData.inventory = [];
     }
 
     return baroData;
@@ -273,18 +278,47 @@ export async function updateCurrentFromApi() {
     const now = new Date();
     const isHere = isBaroActive(baroData.activation, baroData.expiry, now);
 
-    if (!isHere) {
-        return { updated: false, reason: "Baro is not active" };
-    }
-
     await connectToDatabase();
 
     if (!collections.current || !collections.items) {
         throw new Error("Database collections not initialized");
     }
 
+    // If Baro isn't here, update the document to reflect that and clear inventory
+    if (!isHere) {
+        await collections.current.updateOne(
+            {},
+            {
+                $set: {
+                    isActive: false,
+                    activation: baroData.activation,
+                    expiry: baroData.expiry,
+                    location: baroData.location || "",
+                    inventory: []
+                }
+            },
+            { upsert: true }
+        );
+        console.log(`[Baro Update] Baro is not active. Updated current document. Next arrival: ${baroData.activation}`);
+        return {
+            updated: true,
+            isActive: false,
+            activation: baroData.activation,
+            expiry: baroData.expiry
+        };
+    }
+
     if (baroData.inventory.length === 0) {
-        return { updated: false, reason: "No inventory items found" };
+        // Baro is active but API returned no inventory — update status but skip item resolution
+        await updateCurrentCollection(baroData, []);
+        console.warn(`[Baro Update] Baro is active but no inventory items returned from API`);
+        return {
+            updated: true,
+            isActive: true,
+            inventoryCount: 0,
+            activation: baroData.activation,
+            expiry: baroData.expiry
+        };
     }
 
     const today = now.toISOString().split("T")[0];
@@ -326,6 +360,7 @@ export async function updateCurrentFromApi() {
 
     return {
         updated: true,
+        isActive: true,
         inventoryCount: inventoryIds.length,
         totalApiItems: baroData.inventory.length,
         unmatchedItems,
