@@ -4,26 +4,7 @@
  */
 import { sendBaroArrivalNotification, sendBaroDepartingSoonNotification, sendBaroDepartureNotification, sendWishlistMatchNotification } from '../services/notificationService';
 import { getWishlistMatchesForCurrentInventory } from '../services/wishlistService';
-
-const BARO_API_URL = 'https://api.warframestat.us/pc/voidTrader/';
-
-interface WarframestatBaroResponse {
-  id: string;
-  activation: string;
-  expiry: string;
-  character: string;
-  location: string;
-  inventory: any[];
-  active: boolean;
-}
-
-/**
- * Fetch Baro data from the Warframestat API
- */
-async function fetchBaroData(): Promise<WarframestatBaroResponse> {
-  const response = await fetch(BARO_API_URL);
-  return response.json() as Promise<WarframestatBaroResponse>;
-}
+import { fetchBaroData } from '../services/baroApiService';
 
 /**
  * Called on Friday when Baro is expected to arrive.
