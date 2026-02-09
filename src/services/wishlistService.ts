@@ -13,23 +13,28 @@ import { ObjectId } from 'mongodb';
  * @param itemId - The MongoDB ObjectId of the item
  * @param pushToken - The Expo push token to add
  */
-export async function addWishlistPushToken(itemId: ObjectId, pushToken: string): Promise<boolean> {
+export async function addWishlistPushToken(itemId: ObjectId, pushToken?: string): Promise<boolean> {
   await connectToDatabase();
 
   if (!collections.items) {
     throw new Error('Items collection not initialized');
   }
 
+  const updateOps: any = { $inc: { wishlistCount: 1 } };
+  if (pushToken) {
+    updateOps.$addToSet = { wishlistPushTokens: pushToken };
+  }
+
   const result = await collections.items.updateOne(
     { _id: itemId },
-    { $addToSet: { wishlistPushTokens: pushToken } } as any
+    updateOps
   );
 
   if (result.matchedCount === 0) {
     throw new Error(`Item not found: ${itemId}`);
   }
 
-  console.log(`[Wishlist] Added push token to item ${itemId}`);
+  console.log(`[Wishlist] Added wishlist to item ${itemId} (pushToken: ${pushToken ? 'yes' : 'no'})`);
   return true;
 }
 
@@ -38,23 +43,28 @@ export async function addWishlistPushToken(itemId: ObjectId, pushToken: string):
  * @param itemId - The MongoDB ObjectId of the item
  * @param pushToken - The Expo push token to remove
  */
-export async function removeWishlistPushToken(itemId: ObjectId, pushToken: string): Promise<boolean> {
+export async function removeWishlistPushToken(itemId: ObjectId, pushToken?: string): Promise<boolean> {
   await connectToDatabase();
 
   if (!collections.items) {
     throw new Error('Items collection not initialized');
   }
 
+  const updateOps: any = { $inc: { wishlistCount: -1 } };
+  if (pushToken) {
+    updateOps.$pull = { wishlistPushTokens: pushToken };
+  }
+
   const result = await collections.items.updateOne(
     { _id: itemId },
-    { $pull: { wishlistPushTokens: pushToken } } as any
+    updateOps
   );
 
   if (result.matchedCount === 0) {
     throw new Error(`Item not found: ${itemId}`);
   }
 
-  console.log(`[Wishlist] Removed push token from item ${itemId}`);
+  console.log(`[Wishlist] Removed wishlist from item ${itemId} (pushToken: ${pushToken ? 'yes' : 'no'})`);
   return true;
 }
 

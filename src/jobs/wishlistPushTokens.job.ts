@@ -3,7 +3,7 @@ import { addWishlistPushToken, removeWishlistPushToken } from "../services/wishl
 
 export interface WishlistPushTokenPayload {
     item_oid: string;
-    pushToken: string;
+    pushToken?: string;
 }
 
 export async function addWishlistPushTokenJob(payload: WishlistPushTokenPayload): Promise<boolean> {

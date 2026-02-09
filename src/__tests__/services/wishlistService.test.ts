@@ -45,7 +45,7 @@ describe("wishlistService", () => {
   // ── addWishlistPushToken ───────────────────────────────────────────────────
 
   describe("addWishlistPushToken", () => {
-    it("adds push token to item's wishlistPushTokens using $addToSet", async () => {
+    it("adds push token to item's wishlistPushTokens using $addToSet and increments wishlistCount", async () => {
       const itemId = new ObjectId();
       setupCollections();
 
@@ -54,7 +54,7 @@ describe("wishlistService", () => {
       expect(result).toBe(true);
       expect(mockCollections.items.updateOne).toHaveBeenCalledWith(
         { _id: itemId },
-        { $addToSet: { wishlistPushTokens: "ExponentPushToken[abc]" } }
+        { $inc: { wishlistCount: 1 }, $addToSet: { wishlistPushTokens: "ExponentPushToken[abc]" } }
       );
     });
 
@@ -77,7 +77,7 @@ describe("wishlistService", () => {
   // ── removeWishlistPushToken ────────────────────────────────────────────────
 
   describe("removeWishlistPushToken", () => {
-    it("removes push token from item using $pull", async () => {
+    it("removes push token from item using $pull and decrements wishlistCount", async () => {
       const itemId = new ObjectId();
       setupCollections();
 
@@ -86,7 +86,7 @@ describe("wishlistService", () => {
       expect(result).toBe(true);
       expect(mockCollections.items.updateOne).toHaveBeenCalledWith(
         { _id: itemId },
-        { $pull: { wishlistPushTokens: "ExponentPushToken[abc]" } }
+        { $inc: { wishlistCount: -1 }, $pull: { wishlistPushTokens: "ExponentPushToken[abc]" } }
       );
     });
 

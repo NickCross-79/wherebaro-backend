@@ -8,14 +8,14 @@ export async function removeWishlistPushToken(request: HttpRequest, context: Inv
         const body = await request.text();
         const payload: WishlistPushTokenPayload = JSON.parse(body);
 
-        if (!payload.item_oid || !payload.pushToken) {
+        if (!payload.item_oid) {
             return {
                 status: 400,
                 headers: {
                     "Content-Type": "application/json",
                     "Access-Control-Allow-Origin": "*"
                 },
-                body: JSON.stringify({ error: "Missing required fields: item_oid, pushToken" })
+                body: JSON.stringify({ error: "Missing required field: item_oid" })
             };
         }
 

@@ -12,6 +12,7 @@ export default class Item {
         public likes: string[],
         public reviews: string[],
         public uniqueName?: string,
-        public wishlistPushTokens?: string[]
+        public wishlistPushTokens?: string[],
+        public wishlistCount: number = 0
     ) {}
 }

@@ -144,13 +144,10 @@ export async function fetchAllItems(): Promise<Item[]> {
 
     const items = await collections.items.find({}).toArray();
 
-    // Strip sensitive push tokens — return count only
+    // Strip sensitive push tokens — wishlistCount is stored as its own field
     return items.map((item: any) => {
         const { wishlistPushTokens, ...rest } = item;
-        return {
-            ...rest,
-            wishlistCount: Array.isArray(wishlistPushTokens) ? wishlistPushTokens.length : 0,
-        };
+        return rest;
     });
 }
 
