@@ -69,6 +69,39 @@ export async function removeWishlistPushToken(itemId: ObjectId, pushToken?: stri
 }
 
 /**
+ * Bulk add or remove a push token across multiple items.
+ * Does NOT change wishlistCount — used only for notification preference toggling.
+ * @param itemIds - Array of MongoDB ObjectIds
+ * @param pushToken - The Expo push token
+ * @param action - 'add' or 'remove'
+ */
+export async function bulkSyncWishlistPushToken(
+  itemIds: ObjectId[],
+  pushToken: string,
+  action: 'add' | 'remove'
+): Promise<number> {
+  await connectToDatabase();
+
+  if (!collections.items) {
+    throw new Error('Items collection not initialized');
+  }
+
+  if (itemIds.length === 0) return 0;
+
+  const updateOp = action === 'add'
+    ? { $addToSet: { wishlistPushTokens: pushToken } }
+    : { $pull: { wishlistPushTokens: pushToken } };
+
+  const result = await collections.items.updateMany(
+    { _id: { $in: itemIds } },
+    updateOp as any
+  );
+
+  console.log(`[Wishlist] Bulk ${action} push token across ${result.modifiedCount}/${itemIds.length} item(s)`);
+  return result.modifiedCount;
+}
+
+/**
  * Replace an old push token with a new one across all items.
  * Used when a device's push token refreshes.
  * @param oldToken - The old Expo push token
