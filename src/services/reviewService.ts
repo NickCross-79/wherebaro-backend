@@ -154,3 +154,28 @@ export async function deleteReview(reviewId: ObjectId, uid: string): Promise<boo
 
     return true;
 }
+
+/**
+ * Increments the reportCount on a review
+ * @param reviewId Review ObjectId
+ * @returns true if the review was found and updated
+ */
+export async function reportReview(reviewId: ObjectId): Promise<boolean> {
+    await connectToDatabase();
+
+    if (!collections.reviews) {
+        throw new Error("Reviews collection not initialized");
+    }
+
+    const result = await collections.reviews.updateOne(
+        { _id: reviewId },
+        { $inc: { reportCount: 1 } }
+    );
+
+    if (result.matchedCount === 0) {
+        return false;
+    }
+
+    console.log(`🚩 Review ${reviewId} reported (count incremented)`);
+    return true;
+}

@@ -8,6 +8,7 @@ export default class Review {
         public content: string,
         public date: string,
         public time: string,
-        public uid: string
+        public uid: string,
+        public reportCount: number = 0
     ) {}
 }
