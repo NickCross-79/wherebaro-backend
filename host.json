@@ -14,7 +14,15 @@
   },
   "extensions": {
     "http": {
-      "routePrefix": ""
+      "routePrefix": "",
+      "cors": {
+        "allowedOrigins": [
+          "https://wherebaro.app",
+          "https://api.whenbaro.app"
+        ],
+        "allowedMethods": ["GET", "POST", "OPTIONS"],
+        "allowedHeaders": ["Content-Type", "Authorization"]
+      }
     }
   }
 }
