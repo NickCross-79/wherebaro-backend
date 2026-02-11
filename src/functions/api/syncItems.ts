@@ -30,7 +30,7 @@ export async function syncItemsFromWiki(request: HttpRequest, context: Invocatio
 }
 
 app.http('syncItems', {
-    methods: ['POST', 'OPTIONS'],
+    methods: ['GET', 'POST', 'OPTIONS'],
     authLevel: 'anonymous',
     handler: syncItemsFromWiki
 });
