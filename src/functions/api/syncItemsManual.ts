@@ -1,7 +1,7 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { syncItemsJob } from "../../jobs/syncItems.job";
 
-export async function syncItemsFromWiki(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+export async function syncItemsFromWikiManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
     context.log(`Http function processed request for url "${request.url}"`);
     try {
         const result = await syncItemsJob();
@@ -32,5 +32,5 @@ export async function syncItemsFromWiki(request: HttpRequest, context: Invocatio
 app.http('syncItemsManual', {
     methods: ['GET', 'POST', 'OPTIONS'],
     authLevel: 'anonymous',
-    handler: syncItemsFromWiki
+    handler: syncItemsFromWikiManualHttp
 });
