@@ -5,6 +5,15 @@ import { collections, connectToDatabase } from '../db/database.service';
 import { PushToken, CreatePushTokenDto } from '../models/PushToken';
 
 /**
+ * Truncate sensitive data for logging
+ */
+function truncate(value: string | undefined, maxLength: number = 12): string {
+  if (!value) return 'unknown';
+  if (value.length <= maxLength) return value;
+  return `${value.substring(0, maxLength)}...`;
+}
+
+/**
  * Register or update a push token
  */
 export async function registerPushToken(data: CreatePushTokenDto): Promise<PushToken> {
@@ -18,7 +27,7 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
       { token: data.token },
       { $set: { lastUsed: now, isActive: true } }
     );
-    console.log(`[Push Tokens] Updated existing token for device ${data.deviceId || 'unknown'}`);
+    console.log(`[Push Tokens] Updated existing token for device ${truncate(data.deviceId)}`);
     
     return {
       id: existing._id.toString(),
@@ -39,7 +48,7 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
   };
 
   const result = await collections.pushTokens?.insertOne(newToken);
-  console.log(`[Push Tokens] Registered new token for device ${data.deviceId || 'unknown'}`);
+  console.log(`[Push Tokens] Registered new token for device ${truncate(data.deviceId)}`);
 
   return {
     id: result?.insertedId.toString(),

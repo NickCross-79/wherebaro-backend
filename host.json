@@ -15,6 +15,7 @@
   "extensions": {
     "http": {
       "routePrefix": "",
+      "maxRequestBodySize": 1048576,
       "cors": {
         "allowedOrigins": [
           "https://api.whenbaro.app"

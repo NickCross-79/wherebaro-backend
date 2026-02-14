@@ -7,6 +7,14 @@ import { getActivePushTokens, deactivatePushToken } from './pushTokenService';
 const expo = new Expo();
 
 /**
+ * Truncate sensitive data for logging
+ */
+function truncate(value: string, maxLength: number = 20): string {
+  if (!value || value.length <= maxLength) return value;
+  return `${value.substring(0, maxLength)}...`;
+}
+
+/**
  * Send push notifications to all registered devices
  * @param title - Notification title
  * @param body - Notification body
@@ -71,12 +79,12 @@ export async function sendPushNotifications(
 
       if (ticket.status === 'error') {
         failedCount++;
-        console.error(`[Notifications] Failed for ${token}: ${ticket.message} (${ticket.details?.error})`);
+        console.error(`[Notifications] Failed for ${truncate(token)}: ${ticket.message} (${ticket.details?.error})`);
 
         // Only deactivate token if the device itself is unregistered
         // Don't deactivate for server-side config issues like missing FCM key
         if (ticket.details?.error === 'DeviceNotRegistered') {
-          console.log(`[Notifications] Deactivating unregistered device: ${token}`);
+          console.log(`[Notifications] Deactivating unregistered device: ${truncate(token)}`);
           await deactivatePushToken(token);
         }
       } else {
