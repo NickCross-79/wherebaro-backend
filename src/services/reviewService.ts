@@ -1,6 +1,50 @@
 import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
 import Review from "../models/Review";
+import validator from "validator";
+
+/**
+ * Validates and sanitizes review input
+ * @throws Error if validation fails
+ */
+function validateAndSanitizeReview(user: string, content: string): { user: string; content: string } {
+    // Validate and sanitize user display name
+    if (!user || typeof user !== 'string') {
+        throw new Error("Display name is required");
+    }
+    
+    const trimmedUser = user.trim();
+    if (trimmedUser.length === 0) {
+        throw new Error("Display name cannot be empty");
+    }
+    if (trimmedUser.length > 24) {
+        throw new Error("Display name cannot exceed 24 characters");
+    }
+    
+    // Sanitize user name - escape HTML and remove any scripts
+    const sanitizedUser = validator.escape(trimmedUser);
+    
+    // Validate and sanitize review content
+    if (!content || typeof content !== 'string') {
+        throw new Error("Review content is required");
+    }
+    
+    const trimmedContent = content.trim();
+    if (trimmedContent.length === 0) {
+        throw new Error("Review content cannot be empty");
+    }
+    if (trimmedContent.length > 250) {
+        throw new Error("Review content cannot exceed 250 characters");
+    }
+    
+    // Sanitize content - escape HTML to prevent XSS
+    const sanitizedContent = validator.escape(trimmedContent);
+    
+    return {
+        user: sanitizedUser,
+        content: sanitizedContent
+    };
+}
 
 /**
  * Fetches all reviews for a specific item
@@ -16,6 +60,11 @@ export async function getReviewsForItem(itemId: ObjectId): Promise<Review[]> {
 
     if (!collections.reviews) {
         throw new Error("Reviews collection not initialized");
+    }
+
+    // Validate ObjectId
+    if (!ObjectId.isValid(itemId)) {
+        throw new Error("Invalid item ID");
     }
 
     // Get the item to retrieve its reviews array
@@ -57,6 +106,21 @@ export async function postReview(review: Review): Promise<Review> {
     if (!collections.items) {
         throw new Error("Items collection not initialized");
     }
+
+    // Validate ObjectId
+    if (!ObjectId.isValid(review.item_oid)) {
+        throw new Error("Invalid item ID");
+    }
+
+    // Validate and sanitize review input
+    const { user: sanitizedUser, content: sanitizedContent } = validateAndSanitizeReview(
+        review.user,
+        review.content
+    );
+    
+    // Update review with sanitized values
+    review.user = sanitizedUser;
+    review.content = sanitizedContent;
 
     const existingReview = await collections.reviews.findOne({
         item_oid: review.item_oid,
@@ -109,9 +173,29 @@ export async function updateReview(
         throw new Error("Reviews collection not initialized");
     }
 
+    // Validate ObjectId
+    if (!ObjectId.isValid(reviewId)) {
+        throw new Error("Invalid review ID");
+    }
+
+    // Validate and sanitize content (user name doesn't change on update)
+    if (!content || typeof content !== 'string') {
+        throw new Error("Review content is required");
+    }
+    
+    const trimmedContent = content.trim();
+    if (trimmedContent.length === 0) {
+        throw new Error("Review content cannot be empty");
+    }
+    if (trimmedContent.length > 250) {
+        throw new Error("Review content cannot exceed 250 characters");
+    }
+    
+    const sanitizedContent = validator.escape(trimmedContent);
+
     await collections.reviews.updateOne(
         { _id: reviewId, uid },
-        { $set: { content, date, time } }
+        { $set: { content: sanitizedContent, date, time } }
     );
 
     const updated = await collections.reviews.findOne({ _id: reviewId, uid });
@@ -132,6 +216,11 @@ export async function deleteReview(reviewId: ObjectId, uid: string): Promise<boo
 
     if (!collections.items) {
         throw new Error("Items collection not initialized");
+    }
+
+    // Validate ObjectId
+    if (!ObjectId.isValid(reviewId)) {
+        throw new Error("Invalid review ID");
     }
 
     // Get the review to find its item_oid before deleting
@@ -165,6 +254,11 @@ export async function reportReview(reviewId: ObjectId): Promise<boolean> {
 
     if (!collections.reviews) {
         throw new Error("Reviews collection not initialized");
+    }
+
+    // Validate ObjectId
+    if (!ObjectId.isValid(reviewId)) {
+        throw new Error("Invalid review ID");
     }
 
     const result = await collections.reviews.updateOne(
