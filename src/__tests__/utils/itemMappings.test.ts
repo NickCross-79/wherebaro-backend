@@ -1,18 +1,14 @@
 /**
  * Tests for itemMappings utility
  */
-import { isIgnoredBaroItem, MANUAL_UNIQUE_NAME_MAP, IGNORED_BARO_ITEMS, WIKI_EXCLUDED_ITEMS, isWikiExcludedItem } from "../../utils/itemMappings";
+import { isIgnoredBaroItem, MANUAL_UNIQUE_NAME_MAP, IGNORED_BARO_ITEMS, WIKI_EXCLUDED_ITEMS, isWikiExcludedItem, PERMANENT_BARO_ITEMS, isPermanentBaroItem } from "../../utils/itemMappings";
 
 describe("itemMappings", () => {
   describe("isIgnoredBaroItem", () => {
-    it("returns true for 'Void Surplus' (case-insensitive)", () => {
-      expect(isIgnoredBaroItem("Void Surplus")).toBe(true);
-      expect(isIgnoredBaroItem("void surplus")).toBe(true);
-      expect(isIgnoredBaroItem("VOID SURPLUS")).toBe(true);
-    });
-
-    it("returns true for 'Dragon Mod Pack'", () => {
+    it("returns true for 'Dragon Mod Pack' (case-insensitive)", () => {
       expect(isIgnoredBaroItem("Dragon Mod Pack")).toBe(true);
+      expect(isIgnoredBaroItem("dragon mod pack")).toBe(true);
+      expect(isIgnoredBaroItem("DRAGON MOD PACK")).toBe(true);
     });
 
     it("returns true for 'Falcon Mod Pack'", () => {
@@ -57,12 +53,12 @@ describe("itemMappings", () => {
       expect(WIKI_EXCLUDED_ITEMS.length).toBeGreaterThan(0);
     });
 
-    it("contains 'Falcon Mod Pack'", () => {
-      expect(WIKI_EXCLUDED_ITEMS).toContain("Falcon Mod Pack");
+    it("contains 'falcon mod pack' (lowercase)", () => {
+      expect(WIKI_EXCLUDED_ITEMS).toContain("falcon mod pack");
     });
 
-    it("contains 'Dragon Mod Pack'", () => {
-      expect(WIKI_EXCLUDED_ITEMS).toContain("Dragon Mod Pack");
+    it("contains 'dragon mod pack' (lowercase)", () => {
+      expect(WIKI_EXCLUDED_ITEMS).toContain("dragon mod pack");
     });
   });
 
@@ -82,6 +78,33 @@ describe("itemMappings", () => {
 
     it("returns false for empty string", () => {
       expect(isWikiExcludedItem("")).toBe(false);
+    });
+  });
+
+  describe("PERMANENT_BARO_ITEMS", () => {
+    it("is an array of strings", () => {
+      expect(Array.isArray(PERMANENT_BARO_ITEMS)).toBe(true);
+    });
+
+    it("contains 'void surplus'", () => {
+      expect(PERMANENT_BARO_ITEMS).toContain("void surplus");
+    });
+  });
+
+  describe("isPermanentBaroItem", () => {
+    it("returns true for 'Void Surplus' (case-insensitive)", () => {
+      expect(isPermanentBaroItem("Void Surplus")).toBe(true);
+      expect(isPermanentBaroItem("void surplus")).toBe(true);
+      expect(isPermanentBaroItem("VOID SURPLUS")).toBe(true);
+    });
+
+    it("returns false for normal items", () => {
+      expect(isPermanentBaroItem("Primed Flow")).toBe(false);
+      expect(isPermanentBaroItem("Dragon Mod Pack")).toBe(false);
+    });
+
+    it("returns false for empty string", () => {
+      expect(isPermanentBaroItem("")).toBe(false);
     });
   });
 });

@@ -43,6 +43,14 @@ export const WIKI_EXCLUDED_ITEMS: string[] = [
 ];
 
 /**
+ * Permanent items that appear in Baro's inventory every week.
+ * These items should not display offering dates or "last brought" information.
+ */
+export const PERMANENT_BARO_ITEMS: string[] = [
+    "void surplus",
+];
+
+/**
  * Check if a Baro inventory item name should be ignored.
  */
 export function isIgnoredBaroItem(itemName: string): boolean {
@@ -54,4 +62,11 @@ export function isIgnoredBaroItem(itemName: string): boolean {
  */
 export function isWikiExcludedItem(itemName: string): boolean {
     return WIKI_EXCLUDED_ITEMS.includes(itemName.toLowerCase());
+}
+
+/**
+ * Check if an item is permanent (appears every week).
+ */
+export function isPermanentBaroItem(itemName: string): boolean {
+    return PERMANENT_BARO_ITEMS.includes(itemName.toLowerCase());
 }
