@@ -12,7 +12,7 @@ export async function sendTestNotification() {
   });
 
   await sendPushNotifications(
-    'Test Notification 🔔',
+    'Test Notification',
     `This is a test notification sent at ${timeString}`,
     { type: 'test', timestamp: now.toISOString() }
   );

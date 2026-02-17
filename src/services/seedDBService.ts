@@ -15,6 +15,6 @@ export async function insertBaroItems(items: Item[]): Promise<Item[]> {
 
     await collections.items.insertMany(items);
     
-    console.log(`✅ Inserted ${items.length} items into the database`);
+    console.log(`Inserted ${items.length} items into the database`);
     return items;
 }

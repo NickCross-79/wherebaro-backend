@@ -86,7 +86,7 @@ export async function getReviewsForItem(itemId: ObjectId): Promise<Review[]> {
         .sort({ date: -1 })
         .toArray();
 
-    console.log(`✅ Fetched ${reviews.length} reviews for item ${itemId}`);
+    console.log(`Fetched ${reviews.length} reviews for item ${itemId}`);
     
     return reviews as Review[];
 }
@@ -145,7 +145,7 @@ export async function postReview(review: Review): Promise<Review> {
         { $push: { reviews: reviewId.toString() } } as any
     );
     
-    console.log(`✅ Posted review ${reviewId} for item ${review.item_oid}`);
+    console.log(`Posted review ${reviewId} for item ${review.item_oid}`);
     
     // Return the review with its ID
     review._id = reviewId;
@@ -239,7 +239,7 @@ export async function deleteReview(reviewId: ObjectId, uid: string): Promise<boo
         { $pull: { reviews: reviewId.toString() } } as any
     );
 
-    console.log(`✅ Deleted review ${reviewId} from item ${review.item_oid}`);
+    console.log(`Deleted review ${reviewId} from item ${review.item_oid}`);
 
     return true;
 }
@@ -270,6 +270,6 @@ export async function reportReview(reviewId: ObjectId): Promise<boolean> {
         return false;
     }
 
-    console.log(`🚩 Review ${reviewId} reported (count incremented)`);
+    console.log(`Review ${reviewId} reported (count incremented)`);
     return true;
 }

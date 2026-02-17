@@ -23,12 +23,12 @@ export async function seedDB() {
     
     // Batch insert into database
     await insertBaroItems(baroItems);
-    console.log("✅ Database seeding complete!");
+    console.log("Database seeding complete!");
 }
 
-//get data from wiki ✓
-//clean/bundle data ✓
-//insert into mongodb ✓
+//get data from wiki
+//clean/bundle data
+//insert into mongodb
 
 //get data from wiki
 //clean/bundle data

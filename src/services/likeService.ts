@@ -75,7 +75,7 @@ export async function getLikesForItem(itemId: ObjectId): Promise<Like[]> {
         .find({ item_oid: itemId })
         .toArray();
 
-    console.log(`✅ Fetched ${likes.length} likes for item ${itemId}`);
+    console.log(`Fetched ${likes.length} likes for item ${itemId}`);
     
     return likes as Like[];
 }
