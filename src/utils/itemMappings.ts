@@ -22,9 +22,24 @@ export const MANUAL_UNIQUE_NAME_MAP: Record<string, string> = {
  * Matched against the Baro API `item` field (case-insensitive).
  */
 export const IGNORED_BARO_ITEMS: string[] = [
-    "void surplus",
     "dragon mod pack",
     "falcon mod pack",
+];
+
+/**
+ * Items to exclude from wiki scraping and database seeding.
+ * These items will be skipped during seedDB and syncItems operations.
+ * Add item names here that should not be inserted into the database.
+ */
+export const WIKI_EXCLUDED_ITEMS: string[] = [
+    "falcon mod pack",
+    "dragon mod pack",
+    "left elixis latron shoulder plate",
+    "elixis latron leg plate",
+    "elixis latron chest plate",
+    "koi sentinel tail",
+    "orokin catalyst",
+    "axi a8"
 ];
 
 /**
@@ -32,4 +47,11 @@ export const IGNORED_BARO_ITEMS: string[] = [
  */
 export function isIgnoredBaroItem(itemName: string): boolean {
     return IGNORED_BARO_ITEMS.includes(itemName.toLowerCase());
+}
+
+/**
+ * Check if an item should be excluded from wiki scraping/DB seeding.
+ */
+export function isWikiExcludedItem(itemName: string): boolean {
+    return WIKI_EXCLUDED_ITEMS.includes(itemName.toLowerCase());
 }

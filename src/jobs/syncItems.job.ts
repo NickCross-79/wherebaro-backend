@@ -1,12 +1,7 @@
 import { scrape } from "../services/wikiIngestService";
 import { mapRawItemToBaroItem } from "../utils/mapItem";
 import { syncItems } from "../services/syncService";
-
-/** Items to exclude from database sync */
-const EXCLUDED_ITEMS = [
-    "Falcon Mod Pack",
-    "Dragon Mod Pack"
-];
+import { WIKI_EXCLUDED_ITEMS, isWikiExcludedItem } from "../utils/itemMappings";
 
 export async function syncItemsJob() {
     console.log("Starting wiki sync process...");
@@ -19,7 +14,7 @@ export async function syncItemsJob() {
     const wikiItems = rawItemsArray.map(itemData => mapRawItemToBaroItem(itemData));
     
     // Filter out excluded items
-    const filteredItems = wikiItems.filter(item => !EXCLUDED_ITEMS.includes(item.name));
+    const filteredItems = wikiItems.filter(item => !isWikiExcludedItem(item.name));
     const excludedCount = wikiItems.length - filteredItems.length;
     if (excludedCount > 0) {
         console.log(`Excluded ${excludedCount} item(s) from sync`);

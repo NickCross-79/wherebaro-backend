@@ -1,7 +1,7 @@
 /**
  * Tests for itemMappings utility
  */
-import { isIgnoredBaroItem, MANUAL_UNIQUE_NAME_MAP, IGNORED_BARO_ITEMS } from "../../utils/itemMappings";
+import { isIgnoredBaroItem, MANUAL_UNIQUE_NAME_MAP, IGNORED_BARO_ITEMS, WIKI_EXCLUDED_ITEMS, isWikiExcludedItem } from "../../utils/itemMappings";
 
 describe("itemMappings", () => {
   describe("isIgnoredBaroItem", () => {
@@ -48,6 +48,40 @@ describe("itemMappings", () => {
       for (const item of IGNORED_BARO_ITEMS) {
         expect(item).toBe(item.toLowerCase());
       }
+    });
+  });
+
+  describe("WIKI_EXCLUDED_ITEMS", () => {
+    it("is an array of strings", () => {
+      expect(Array.isArray(WIKI_EXCLUDED_ITEMS)).toBe(true);
+      expect(WIKI_EXCLUDED_ITEMS.length).toBeGreaterThan(0);
+    });
+
+    it("contains 'Falcon Mod Pack'", () => {
+      expect(WIKI_EXCLUDED_ITEMS).toContain("Falcon Mod Pack");
+    });
+
+    it("contains 'Dragon Mod Pack'", () => {
+      expect(WIKI_EXCLUDED_ITEMS).toContain("Dragon Mod Pack");
+    });
+  });
+
+  describe("isWikiExcludedItem", () => {
+    it("returns true for 'Falcon Mod Pack'", () => {
+      expect(isWikiExcludedItem("Falcon Mod Pack")).toBe(true);
+    });
+
+    it("returns true for 'Dragon Mod Pack'", () => {
+      expect(isWikiExcludedItem("Dragon Mod Pack")).toBe(true);
+    });
+
+    it("returns false for normal items", () => {
+      expect(isWikiExcludedItem("Primed Flow")).toBe(false);
+      expect(isWikiExcludedItem("Prisma Grinlok")).toBe(false);
+    });
+
+    it("returns false for empty string", () => {
+      expect(isWikiExcludedItem("")).toBe(false);
     });
   });
 });

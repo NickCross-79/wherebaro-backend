@@ -1,6 +1,7 @@
 import { scrape } from "../services/wikiIngestService";
 import { mapRawItemToBaroItem } from "../utils/mapItem";
 import { insertBaroItems } from "../services/seedDBService";
+import { isWikiExcludedItem } from "../utils/itemMappings";
 
 export async function seedDB() {
     console.log("Starting DB seeding process...");
@@ -19,7 +20,14 @@ export async function seedDB() {
     console.log(`Found ${rawItemsArray.length} items`);
     
     // Map each raw item to BaroItem
-    const baroItems = rawItemsArray.map(itemData => mapRawItemToBaroItem(itemData));
+    const wikiItems = rawItemsArray.map(itemData => mapRawItemToBaroItem(itemData));
+    
+    // Filter out excluded items
+    const baroItems = wikiItems.filter(item => !isWikiExcludedItem(item.name));
+    const excludedCount = wikiItems.length - baroItems.length;
+    if (excludedCount > 0) {
+        console.log(`Excluded ${excludedCount} item(s) from seeding`);
+    }
     
     // Batch insert into database
     await insertBaroItems(baroItems);
