@@ -13,7 +13,8 @@ export async function getAllItems(request: HttpRequest, context: InvocationConte
                 "Content-Type": "application/json",
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-                "Access-Control-Allow-Headers": "Content-Type"
+                "Access-Control-Allow-Headers": "Content-Type",
+                "Cache-Control": "public, max-age=120, stale-while-revalidate=600"
             },
             body: JSON.stringify(items)
         };
