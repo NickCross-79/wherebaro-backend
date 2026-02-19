@@ -85,7 +85,9 @@ async function resolveOrInsertItem(
             [today],
             [],
             [],
-            wfcdItem.uniqueName
+            wfcdItem.uniqueName,
+            [], // Initial empty wishlistPushTokens
+            0   // Initial wishlistCount
         );
 
         const result = await collections.items.insertOne(newItem as any);

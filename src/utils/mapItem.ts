@@ -32,7 +32,10 @@ export function mapRawItemToBaroItem(rawData: any): Item {
         rawData.Type,
         combinedOfferingDates,
         [], // Initial empty likes array
-        []  // Initial empty reviews array
+        [], // Initial empty reviews array
+        undefined, // uniqueName
+        [], // Initial empty wishlistPushTokens array
+        0   // Initial wishlistCount
     );
 }
 

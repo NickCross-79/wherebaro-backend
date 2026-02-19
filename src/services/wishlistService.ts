@@ -20,6 +20,14 @@ export async function addWishlistPushToken(itemId: ObjectId, pushToken?: string)
     throw new Error('Items collection not initialized');
   }
 
+  // Ensure wishlistPushTokens is an array (may be null on older documents)
+  if (pushToken) {
+    await collections.items.updateOne(
+      { _id: itemId, wishlistPushTokens: null },
+      { $set: { wishlistPushTokens: [] } }
+    );
+  }
+
   const updateOps: any = { $inc: { wishlistCount: 1 } };
   if (pushToken) {
     updateOps.$addToSet = { wishlistPushTokens: pushToken };
@@ -87,6 +95,14 @@ export async function bulkSyncWishlistPushToken(
   }
 
   if (itemIds.length === 0) return 0;
+
+  // Ensure wishlistPushTokens is an array (may be null on older documents)
+  if (action === 'add') {
+    await collections.items.updateMany(
+      { _id: { $in: itemIds }, wishlistPushTokens: null },
+      { $set: { wishlistPushTokens: [] } }
+    );
+  }
 
   const updateOp = action === 'add'
     ? { $addToSet: { wishlistPushTokens: pushToken } }

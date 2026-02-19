@@ -14,7 +14,7 @@ export async function getCurrent(request: HttpRequest, context: InvocationContex
                 "Access-Control-Allow-Origin": "*",
                 "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
                 "Access-Control-Allow-Headers": "Content-Type",
-                "Cache-Control": "public, max-age=120, stale-while-revalidate=600"
+                "Cache-Control": "no-cache, no-store, must-revalidate"
             },
             body: JSON.stringify(baroData)
         };
