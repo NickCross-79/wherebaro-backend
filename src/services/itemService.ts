@@ -1,25 +1,20 @@
 import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
 import Item from "../models/Item";
-import Items from "@wfcd/items";
-import { isIgnoredBaroItem, MANUAL_UNIQUE_NAME_MAP } from "../utils/itemMappings";
+import { isIgnoredBaroItem } from "../utils/itemMappings";
 import { BaroApiInventoryItem } from "./baroApiService";
-import { WfcdItem } from "../types/WfcdItem";
+import {
+    WfcdItem,
+    getUniqueNameSuffix,
+    lookupWfcdItem,
+    getWfcdItems,
+    buildWfcdNameMaps,
+    findWfcdMatch,
+} from "../utils/wfcdItems";
 
 const WF_CDN_BASE = "https://cdn.warframestat.us/img";
 
-// Lazily cached @wfcd/items dataset
-let wfcdItemsCache: WfcdItem[] | null = null;
-
-// ─── WFCD Item Lookup ────────────────────────────────────────────────────────
-
-/**
- * Extracts the last segment from a uniqueName path.
- * e.g. "/Lotus/StoreItems/Types/Items/ShipDecos/Foo" → "Foo"
- */
-function getUniqueNameSuffix(uniqueName: string): string {
-    return uniqueName.split("/").pop() || uniqueName;
-}
+// ─── DB Lookup ───────────────────────────────────────────────────────────────
 
 /**
  * Finds an existing DB item by uniqueName suffix match.
@@ -28,21 +23,6 @@ async function findItemBySuffix(suffix: string) {
     return collections.items!.findOne({
         uniqueName: { $regex: new RegExp(`/${suffix}$`) },
     });
-}
-
-/**
- * Looks up a Warframe item by the last segment of its uniqueName
- * using the @wfcd/items library.
- */
-function lookupWfcdItem(suffix: string): WfcdItem | null {
-    if (!wfcdItemsCache) {
-        wfcdItemsCache = new Items() as any as WfcdItem[];
-    }
-    return (
-        wfcdItemsCache.find(
-            (item) => item.uniqueName?.endsWith(`/${suffix}`)
-        ) ?? null
-    );
 }
 
 // ─── Item Resolution ─────────────────────────────────────────────────────────
@@ -290,61 +270,6 @@ export async function resolveBaroInventory(inventory: BaroApiInventoryItem[]): P
 // ─── Backfill Unique Names ───────────────────────────────────────────────────
 
 /**
- * Normalize a name for fuzzy matching:
- * - Strip quantity prefixes like "5 x " or "10 x "
- * - Strip parenthetical suffixes like "(Operator)"
- * - Strip "Blueprint" suffix
- * - Strip "Left " / "Right " prefixes
- * - Replace "Relic" suffix with "Intact" (wfcd stores relics as "Axi A5 Intact")
- * - Lowercase
- */
-function normalizeName(name: string): string {
-    let n = name.trim();
-    n = n.replace(/^\d+\s*x\s+/i, "");
-    n = n.replace(/\s*\([^)]*\)\s*$/, "");
-    n = n.replace(/\s+Blueprint$/i, "");
-    n = n.replace(/^(Left|Right)\s+/i, "");
-    n = n.replace(/\s+Relic$/i, " Intact");
-    return n.toLowerCase().trim();
-}
-
-/**
- * Attempt multiple matching strategies against the wfcd name map.
- * Returns the matched WfcdItem or null.
- */
-function findWfcdMatch(
-    dbItemName: string,
-    wfcdByExactName: Map<string, WfcdItem>,
-    wfcdByNormalized: Map<string, WfcdItem>,
-    allWfcdItems: WfcdItem[]
-): WfcdItem | null {
-    const lower = dbItemName.toLowerCase();
-
-    // Strategy 1: Exact name match (case-insensitive)
-    const exact = wfcdByExactName.get(lower);
-    if (exact) return exact;
-
-    // Strategy 2: Normalized name match
-    const normalized = normalizeName(dbItemName);
-    const normMatch = wfcdByNormalized.get(normalized);
-    if (normMatch) return normMatch;
-
-    // Strategy 3: Contains match — find wfcd item whose name is contained in DB name
-    const containsMatch = allWfcdItems.find(
-        (item) => lower.includes(item.name.toLowerCase()) && item.name.length > 3
-    );
-    if (containsMatch) return containsMatch;
-
-    // Strategy 4: Manual mapping for items not in @wfcd/items
-    const manualUniqueName = MANUAL_UNIQUE_NAME_MAP[lower];
-    if (manualUniqueName) {
-        return { name: dbItemName, uniqueName: manualUniqueName } as WfcdItem;
-    }
-
-    return null;
-}
-
-/**
  * Backfills the uniqueName field on all items in the DB that don't have one.
  * Uses the @wfcd/items library to match items by name and write the full uniqueName.
  */
@@ -360,23 +285,7 @@ export async function backfillUniqueNames(): Promise<{
         throw new Error("Items collection not initialized");
     }
 
-    // Reuse the cached wfcd dataset
-    if (!wfcdItemsCache) {
-        wfcdItemsCache = new Items() as unknown as WfcdItem[];
-    }
-
-    const wfcdByExactName = new Map<string, WfcdItem>();
-    const wfcdByNormalized = new Map<string, WfcdItem>();
-    const allWfcdItems: WfcdItem[] = [];
-
-    for (const item of wfcdItemsCache) {
-        if (item.name && item.uniqueName) {
-            wfcdByExactName.set(item.name.toLowerCase(), item);
-            wfcdByNormalized.set(normalizeName(item.name), item);
-            allWfcdItems.push(item);
-        }
-    }
-
+    const { wfcdByExactName, wfcdByNormalized, allWfcdItems } = buildWfcdNameMaps();
     console.log(`[Backfill] Loaded ${wfcdByExactName.size} items from @wfcd/items library`);
 
     // Find all DB items missing a uniqueName
