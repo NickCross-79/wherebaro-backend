@@ -213,14 +213,14 @@ describe("itemService", () => {
     it("handles mixed inventory (existing, new, ignored, unknown)", async () => {
       const existingId = new ObjectId();
       const newInsertedId = new ObjectId();
-      let findOneCallCount = 0;
 
       mockItemsCollection({
-        findOne: jest.fn().mockImplementation(() => {
-          findOneCallCount++;
-          // First call: found existing item. Second call: not found.
-          // Third call: not found (mystery item not in wfcd).
-          if (findOneCallCount === 1) return Promise.resolve({ _id: existingId });
+        findOne: jest.fn().mockImplementation((query: any) => {
+          // Match by uniqueName regex — simulate Primed Flow existing in DB
+          const regex = query?.uniqueName?.$regex;
+          if (regex && regex.test("/Lotus/Upgrades/Mods/Fusers/PrimedFlow")) {
+            return Promise.resolve({ _id: existingId });
+          }
           return Promise.resolve(null);
         }),
         insertOne: jest.fn().mockResolvedValue({ insertedId: newInsertedId }),
