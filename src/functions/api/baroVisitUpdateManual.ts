@@ -1,11 +1,11 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { updateCurrentJob } from "../../jobs/updateCurrent.job";
+import { baroArrivalJob } from "../../jobs/baroArrival.job";
 
 export async function baroVisitUpdateManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
   context.log(`Http function processed request for url "${request.url}"`);
 
   try {
-    const result = await updateCurrentJob();
+    const result = await baroArrivalJob();
 
     return {
       status: 202,

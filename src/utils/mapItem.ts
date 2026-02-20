@@ -38,13 +38,3 @@ export function mapRawItemToBaroItem(rawData: any): Item {
         0   // Initial wishlistCount
     );
 }
-
-/**
- * Maps a collection of raw items (from JSON data)
- * @param rawItems Object with item names as keys and item data as values
- */
-export function mapRawItemsCollection(rawItems: Record<string, RawBaroItemData>): Item[] {
-    return Object.entries(rawItems).map(([_, itemData]) => 
-        mapRawItemToBaroItem(itemData)
-    );
-}

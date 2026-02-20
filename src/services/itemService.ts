@@ -4,22 +4,12 @@ import Item from "../models/Item";
 import Items from "@wfcd/items";
 import { isIgnoredBaroItem } from "../utils/itemMappings";
 import { BaroApiInventoryItem } from "./baroApiService";
+import { WfcdItem } from "../types/WfcdItem";
 
 const WF_CDN_BASE = "https://cdn.warframestat.us/img";
 
 // Lazily cached @wfcd/items dataset
 let wfcdItemsCache: WfcdItem[] | null = null;
-
-// ─── Interfaces ──────────────────────────────────────────────────────────────
-
-interface WfcdItem {
-    name: string;
-    uniqueName: string;
-    imageName?: string;
-    type?: string;
-    category?: string;
-    description?: string;
-}
 
 // ─── WFCD Item Lookup ────────────────────────────────────────────────────────
 

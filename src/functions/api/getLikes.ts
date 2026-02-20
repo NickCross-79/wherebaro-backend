@@ -6,7 +6,8 @@ export async function getLikes(request: HttpRequest, context: InvocationContext)
 
     try {
         // Get item_id from query parameters or request body
-        const itemId = request.query.get('item_id') || (await request.text() && JSON.parse(await request.text()).item_id);
+        const bodyText = await request.text();
+        const itemId = request.query.get('item_id') || (bodyText ? JSON.parse(bodyText).item_id : undefined);
 
         if (!itemId) {
             return {

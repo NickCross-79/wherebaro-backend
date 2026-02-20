@@ -1,7 +1,7 @@
 /**
  * Tests for mapItem utility
  */
-import { mapRawItemToBaroItem, mapRawItemsCollection } from "../../utils/mapItem";
+import { mapRawItemToBaroItem } from "../../utils/mapItem";
 import Item from "../../models/Item";
 
 describe("mapItem", () => {
@@ -84,43 +84,6 @@ describe("mapItem", () => {
       expect(item).toBeInstanceOf(Item);
       expect(item.name).toBeUndefined();
       expect(item.offeringDates).toEqual([]);
-    });
-  });
-
-  // ── mapRawItemsCollection ──────────────────────────────────────────────────
-
-  describe("mapRawItemsCollection", () => {
-    it("maps a collection of raw items to Item array", () => {
-      const rawItems = {
-        "Primed Flow": {
-          Name: "Primed Flow",
-          Image: "flow.png",
-          Link: "/flow",
-          CreditCost: 175000,
-          DucatCost: 300,
-          Type: "Mod",
-          OfferingDates: ["2024-01-10"],
-        },
-        "Prisma Grinlok": {
-          Name: "Prisma Grinlok",
-          Image: "grinlok.png",
-          Link: "/grinlok",
-          CreditCost: 50000,
-          DucatCost: 500,
-          Type: "Weapon",
-          OfferingDates: ["2024-02-20"],
-        },
-      } as any;
-
-      const result = mapRawItemsCollection(rawItems);
-
-      expect(result).toHaveLength(2);
-      expect(result[0]).toBeInstanceOf(Item);
-      expect(result[1]).toBeInstanceOf(Item);
-    });
-
-    it("returns empty array for empty input", () => {
-      expect(mapRawItemsCollection({})).toEqual([]);
     });
   });
 });

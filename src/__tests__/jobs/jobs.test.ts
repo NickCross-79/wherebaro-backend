@@ -25,7 +25,6 @@ jest.mock("../../services/reviewService", () => ({
 
 jest.mock("../../services/currentService", () => ({
   fetchCurrent: jest.fn().mockResolvedValue({ isActive: false, items: [] }),
-  updateCurrentFromApi: jest.fn().mockResolvedValue({ updated: true }),
 }));
 
 jest.mock("../../services/itemService", () => ({
@@ -50,7 +49,6 @@ import { postReviewJob } from "../../jobs/postReview.job";
 import { updateReviewJob } from "../../jobs/updateReview.job";
 import { deleteReviewJob } from "../../jobs/deleteReview.job";
 import { getCurrentJob } from "../../jobs/getCurrent.job";
-import { updateCurrentJob } from "../../jobs/updateCurrent.job";
 import { getAllItemsJob } from "../../jobs/getAllItems.job";
 import { getLikesJob } from "../../jobs/getLikes.job";
 import { registerPushTokenJob } from "../../jobs/registerPushToken.job";
@@ -60,7 +58,7 @@ import { sendTestNotification } from "../../jobs/testNotification.job";
 import { addLike, removeLike, getLikesForItem } from "../../services/likeService";
 import { addWishlistPushToken, removeWishlistPushToken } from "../../services/wishlistService";
 import { getReviewsForItem, postReview, updateReview, deleteReview } from "../../services/reviewService";
-import { fetchCurrent, updateCurrentFromApi } from "../../services/currentService";
+import { fetchCurrent } from "../../services/currentService";
 import { fetchAllItems } from "../../services/itemService";
 import { registerPushToken, removePushToken } from "../../services/pushTokenService";
 import { sendPushNotifications } from "../../services/notificationService";
@@ -173,15 +171,6 @@ describe("Job wrappers", () => {
     it("delegates to fetchCurrent", async () => {
       await getCurrentJob();
       expect(fetchCurrent).toHaveBeenCalled();
-    });
-  });
-
-  // ── updateCurrent.job ──────────────────────────────────────────────────────
-
-  describe("updateCurrent.job", () => {
-    it("delegates to updateCurrentFromApi", async () => {
-      await updateCurrentJob();
-      expect(updateCurrentFromApi).toHaveBeenCalled();
     });
   });
 

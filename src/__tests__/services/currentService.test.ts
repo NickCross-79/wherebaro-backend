@@ -2,7 +2,7 @@
  * Tests for currentService
  */
 import { ObjectId } from "mongodb";
-import { fetchCurrent, updateCurrentFromApi } from "../../services/currentService";
+import { fetchCurrent, upsertCurrent } from "../../services/currentService";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -14,22 +14,6 @@ jest.mock("../../db/database.service", () => ({
 import { collections } from "../../db/database.service";
 const mockCollections = collections as Record<string, any>;
 
-jest.mock("../../services/baroApiService", () => ({
-  fetchBaroData: jest.fn(),
-  isBaroActive: jest.fn(),
-}));
-
-jest.mock("../../services/itemService", () => ({
-  resolveBaroInventory: jest.fn(),
-}));
-
-import { fetchBaroData, isBaroActive } from "../../services/baroApiService";
-import { resolveBaroInventory } from "../../services/itemService";
-
-const mockFetchBaroData = fetchBaroData as jest.Mock;
-const mockIsBaroActive = isBaroActive as jest.Mock;
-const mockResolveBaroInventory = resolveBaroInventory as jest.Mock;
-
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function setupCollections(currentData: any = null, itemsData: any[] = []) {
@@ -39,16 +23,6 @@ function setupCollections(currentData: any = null, itemsData: any[] = []) {
   };
   mockCollections.items = {
     find: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue(itemsData) }),
-  };
-}
-
-function baroApiData(overrides: Record<string, any> = {}) {
-  return {
-    activation: "2025-01-10T14:00:00.000Z",
-    expiry: "2025-01-12T14:00:00.000Z",
-    location: "Strata Relay",
-    inventory: [{ uniqueName: "/Foo", item: "Primed Flow", ducats: 300, credits: 175000 }],
-    ...overrides,
   };
 }
 
@@ -136,92 +110,64 @@ describe("currentService", () => {
     });
   });
 
-  // ── updateCurrentFromApi ───────────────────────────────────────────────────
+  // ── upsertCurrent ───────────────────────────────────────────────────────────
 
-  describe("updateCurrentFromApi", () => {
-    it("stores inactive status when Baro is absent", async () => {
-      const baro = baroApiData({ inventory: [] });
-      mockFetchBaroData.mockResolvedValue(baro);
-      mockIsBaroActive.mockReturnValue(false);
+  describe("upsertCurrent", () => {
+    it("stores inactive status with empty inventory", async () => {
       setupCollections();
 
-      const result = await updateCurrentFromApi();
+      await upsertCurrent(false, "2025-01-10T14:00:00.000Z", "2025-01-12T14:00:00.000Z", "Strata Relay");
 
-      expect(result.isActive).toBe(false);
       expect(mockCollections.current.updateOne).toHaveBeenCalledWith(
         {},
         {
-          $set: expect.objectContaining({
+          $set: {
             isActive: false,
+            activation: "2025-01-10T14:00:00.000Z",
+            expiry: "2025-01-12T14:00:00.000Z",
             location: "Strata Relay",
-          }),
+            inventory: [],
+          },
         },
         { upsert: true }
       );
     });
 
-    it("stores active status with resolved inventory IDs when Baro is here", async () => {
-      const baro = baroApiData();
-      mockFetchBaroData.mockResolvedValue(baro);
-      mockIsBaroActive.mockReturnValue(true);
-
-      const resolvedIds = [new ObjectId(), new ObjectId()];
-      mockResolveBaroInventory.mockResolvedValue({
-        inventoryIds: resolvedIds,
-        unmatchedItems: [],
-        ignoredItems: [],
-      });
+    it("stores active status with resolved inventory IDs", async () => {
       setupCollections();
+      const resolvedIds = [new ObjectId(), new ObjectId()];
 
-      const result = await updateCurrentFromApi();
+      await upsertCurrent(true, "2025-01-10T14:00:00.000Z", "2025-01-12T14:00:00.000Z", "Strata Relay", resolvedIds);
 
-      expect(result.isActive).toBe(true);
-      expect(result.inventoryCount).toBe(2);
       expect(mockCollections.current.updateOne).toHaveBeenCalledWith(
         {},
         {
-          $set: expect.objectContaining({
+          $set: {
             isActive: true,
+            activation: "2025-01-10T14:00:00.000Z",
+            expiry: "2025-01-12T14:00:00.000Z",
+            location: "Strata Relay",
             inventory: resolvedIds,
-          }),
+          },
         },
         { upsert: true }
       );
     });
 
-    it("handles Baro active with empty inventory", async () => {
-      const baro = baroApiData({ inventory: [] });
-      mockFetchBaroData.mockResolvedValue(baro);
-      mockIsBaroActive.mockReturnValue(true);
+    it("defaults empty location to empty string", async () => {
       setupCollections();
 
-      const result = await updateCurrentFromApi();
+      await upsertCurrent(true, "2025-01-10T14:00:00.000Z", "2025-01-12T14:00:00.000Z", "");
 
-      expect(result.isActive).toBe(true);
-      expect(result.inventoryCount).toBe(0);
-    });
-
-    it("reports unmatched items from resolveBaroInventory", async () => {
-      const baro = baroApiData();
-      mockFetchBaroData.mockResolvedValue(baro);
-      mockIsBaroActive.mockReturnValue(true);
-      mockResolveBaroInventory.mockResolvedValue({
-        inventoryIds: [],
-        unmatchedItems: ["Mystery Widget"],
-        ignoredItems: [],
-      });
-      setupCollections();
-
-      const result = await updateCurrentFromApi();
-      expect(result.unmatchedItems).toContain("Mystery Widget");
+      const call = mockCollections.current.updateOne.mock.calls[0];
+      expect(call[1].$set.location).toBe("");
     });
 
     it("throws when current collection is not initialized", async () => {
-      mockFetchBaroData.mockResolvedValue(baroApiData());
-      mockIsBaroActive.mockReturnValue(false);
       // Don't setup collections
-
-      await expect(updateCurrentFromApi()).rejects.toThrow("Current collection not initialized");
+      await expect(
+        upsertCurrent(false, "2025-01-10T14:00:00.000Z", "2025-01-12T14:00:00.000Z", "Strata Relay")
+      ).rejects.toThrow("Current collection not initialized");
     });
   });
 });

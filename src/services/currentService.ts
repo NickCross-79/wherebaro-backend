@@ -2,11 +2,12 @@
  * Service for managing the `current` collection document.
  * This single document tracks Baro Ki'Teer's status, location,
  * activation/expiry times, and his current inventory (as item ObjectIds).
+ *
+ * Pure DB operations only — no external API calls or item resolution.
+ * Orchestration (fetch → resolve → store) lives in the jobs layer.
  */
 import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
-import { fetchBaroData, isBaroActive, BaroApiResponse } from "./baroApiService";
-import { resolveBaroInventory } from "./itemService";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
@@ -16,35 +17,6 @@ export interface CurrentBaroData {
     expiry: string;
     location: string;
     items: any[];
-}
-
-// ─── Helpers ─────────────────────────────────────────────────────────────────
-
-/**
- * Upserts the single `current` document with Baro's status and inventory.
- */
-async function upsertCurrentDocument(
-    isActive: boolean,
-    baroData: BaroApiResponse,
-    inventoryIds: ObjectId[] = []
-): Promise<void> {
-    if (!collections.current) {
-        throw new Error("Current collection not initialized");
-    }
-
-    await collections.current.updateOne(
-        {},
-        {
-            $set: {
-                isActive,
-                activation: baroData.activation,
-                expiry: baroData.expiry,
-                location: baroData.location || "",
-                inventory: inventoryIds,
-            },
-        },
-        { upsert: true }
-    );
 }
 
 // ─── Exported Functions ──────────────────────────────────────────────────────
@@ -92,45 +64,33 @@ export async function fetchCurrent(): Promise<CurrentBaroData> {
 }
 
 /**
- * Fetches Baro data from the external API and updates the `current` document.
- * - Baro absent: stores inactive status with next arrival time, clears inventory.
- * - Baro active: delegates item resolution to itemService, then stores the IDs.
+ * Upserts the single `current` document with Baro's status and inventory.
+ * Accepts plain fields — no dependency on API response types.
  */
-export async function updateCurrentFromApi() {
-    const baroData = await fetchBaroData();
-    const now = new Date();
-    const isHere = isBaroActive(baroData.activation, baroData.expiry, now);
-
+export async function upsertCurrent(
+    isActive: boolean,
+    activation: string,
+    expiry: string,
+    location: string,
+    inventoryIds: ObjectId[] = []
+): Promise<void> {
     await connectToDatabase();
+
     if (!collections.current) {
         throw new Error("Current collection not initialized");
     }
 
-    // Baro is absent
-    if (!isHere) {
-        await upsertCurrentDocument(false, baroData);
-        console.log(`[Current] Baro is not active. Next arrival: ${baroData.activation}`);
-        return { updated: true, isActive: false, activation: baroData.activation, expiry: baroData.expiry };
-    }
-
-    // Baro is active but API returned no inventory
-    if (baroData.inventory.length === 0) {
-        await upsertCurrentDocument(true, baroData);
-        console.warn(`[Current] Baro is active but API returned no inventory`);
-        return { updated: true, isActive: true, inventoryCount: 0, activation: baroData.activation, expiry: baroData.expiry };
-    }
-
-    // Resolve inventory items via itemService, then store the IDs
-    const { inventoryIds, unmatchedItems } = await resolveBaroInventory(baroData.inventory);
-    await upsertCurrentDocument(true, baroData, inventoryIds);
-
-    return {
-        updated: true,
-        isActive: true,
-        inventoryCount: inventoryIds.length,
-        totalApiItems: baroData.inventory.length,
-        unmatchedItems,
-        activation: baroData.activation,
-        expiry: baroData.expiry,
-    };
+    await collections.current.updateOne(
+        {},
+        {
+            $set: {
+                isActive,
+                activation,
+                expiry,
+                location: location || "",
+                inventory: inventoryIds,
+            },
+        },
+        { upsert: true }
+    );
 }

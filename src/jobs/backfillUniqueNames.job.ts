@@ -1,14 +1,7 @@
 import { collections, connectToDatabase } from "../db/database.service";
 import Items from "@wfcd/items";
 import { MANUAL_UNIQUE_NAME_MAP } from "../utils/itemMappings";
-
-interface WfcdItem {
-    name: string;
-    uniqueName: string;
-    imageName?: string;
-    type?: string;
-    category?: string;
-}
+import { WfcdItem } from "../types/WfcdItem";
 
 /**
  * Normalize a name for fuzzy matching:

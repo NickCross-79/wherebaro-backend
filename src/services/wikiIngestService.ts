@@ -2,6 +2,9 @@ import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
 import { load } from 'cheerio';
+import { mapRawItemToBaroItem } from '../utils/mapItem';
+import { isWikiExcludedItem } from '../utils/itemMappings';
+import Item from '../models/Item';
 
 const baroDataURL = "https://wiki.warframe.com/w/Module:Baro/data?action=edit";
 
@@ -186,3 +189,26 @@ async function scrape() {
 }
 
 export { scrape };
+
+/**
+ * Complete wiki pipeline: scrape → map to Item models → filter exclusions.
+ * Shared by seedDB and syncItems jobs.
+ */
+export async function scrapeAndPrepareBaroItems(): Promise<Item[]> {
+  const data = await scrape();
+  const rawItems = data.Items;
+  if (!rawItems) throw new Error("No Items found in scraped data");
+
+  const rawItemsArray = Object.values(rawItems);
+  console.log(`Found ${rawItemsArray.length} items from wiki`);
+
+  const wikiItems = rawItemsArray.map(itemData => mapRawItemToBaroItem(itemData));
+  const filtered = wikiItems.filter(item => !isWikiExcludedItem(item.name));
+
+  const excludedCount = wikiItems.length - filtered.length;
+  if (excludedCount > 0) {
+    console.log(`Excluded ${excludedCount} item(s)`);
+  }
+
+  return filtered;
+}
