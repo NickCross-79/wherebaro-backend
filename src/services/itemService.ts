@@ -2,7 +2,7 @@ import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
 import Item from "../models/Item";
 import Items from "@wfcd/items";
-import { isIgnoredBaroItem } from "../utils/itemMappings";
+import { isIgnoredBaroItem, MANUAL_UNIQUE_NAME_MAP } from "../utils/itemMappings";
 import { BaroApiInventoryItem } from "./baroApiService";
 import { WfcdItem } from "../types/WfcdItem";
 
@@ -285,4 +285,136 @@ export async function resolveBaroInventory(inventory: BaroApiInventoryItem[]): P
     }
 
     return { inventoryIds, unmatchedItems, ignoredItems };
+}
+
+// ─── Backfill Unique Names ───────────────────────────────────────────────────
+
+/**
+ * Normalize a name for fuzzy matching:
+ * - Strip quantity prefixes like "5 x " or "10 x "
+ * - Strip parenthetical suffixes like "(Operator)"
+ * - Strip "Blueprint" suffix
+ * - Strip "Left " / "Right " prefixes
+ * - Replace "Relic" suffix with "Intact" (wfcd stores relics as "Axi A5 Intact")
+ * - Lowercase
+ */
+function normalizeName(name: string): string {
+    let n = name.trim();
+    n = n.replace(/^\d+\s*x\s+/i, "");
+    n = n.replace(/\s*\([^)]*\)\s*$/, "");
+    n = n.replace(/\s+Blueprint$/i, "");
+    n = n.replace(/^(Left|Right)\s+/i, "");
+    n = n.replace(/\s+Relic$/i, " Intact");
+    return n.toLowerCase().trim();
+}
+
+/**
+ * Attempt multiple matching strategies against the wfcd name map.
+ * Returns the matched WfcdItem or null.
+ */
+function findWfcdMatch(
+    dbItemName: string,
+    wfcdByExactName: Map<string, WfcdItem>,
+    wfcdByNormalized: Map<string, WfcdItem>,
+    allWfcdItems: WfcdItem[]
+): WfcdItem | null {
+    const lower = dbItemName.toLowerCase();
+
+    // Strategy 1: Exact name match (case-insensitive)
+    const exact = wfcdByExactName.get(lower);
+    if (exact) return exact;
+
+    // Strategy 2: Normalized name match
+    const normalized = normalizeName(dbItemName);
+    const normMatch = wfcdByNormalized.get(normalized);
+    if (normMatch) return normMatch;
+
+    // Strategy 3: Contains match — find wfcd item whose name is contained in DB name
+    const containsMatch = allWfcdItems.find(
+        (item) => lower.includes(item.name.toLowerCase()) && item.name.length > 3
+    );
+    if (containsMatch) return containsMatch;
+
+    // Strategy 4: Manual mapping for items not in @wfcd/items
+    const manualUniqueName = MANUAL_UNIQUE_NAME_MAP[lower];
+    if (manualUniqueName) {
+        return { name: dbItemName, uniqueName: manualUniqueName } as WfcdItem;
+    }
+
+    return null;
+}
+
+/**
+ * Backfills the uniqueName field on all items in the DB that don't have one.
+ * Uses the @wfcd/items library to match items by name and write the full uniqueName.
+ */
+export async function backfillUniqueNames(): Promise<{
+    total: number;
+    matched: number;
+    unmatched: number;
+    unmatchedNames: string[];
+}> {
+    await connectToDatabase();
+
+    if (!collections.items) {
+        throw new Error("Items collection not initialized");
+    }
+
+    // Reuse the cached wfcd dataset
+    if (!wfcdItemsCache) {
+        wfcdItemsCache = new Items() as unknown as WfcdItem[];
+    }
+
+    const wfcdByExactName = new Map<string, WfcdItem>();
+    const wfcdByNormalized = new Map<string, WfcdItem>();
+    const allWfcdItems: WfcdItem[] = [];
+
+    for (const item of wfcdItemsCache) {
+        if (item.name && item.uniqueName) {
+            wfcdByExactName.set(item.name.toLowerCase(), item);
+            wfcdByNormalized.set(normalizeName(item.name), item);
+            allWfcdItems.push(item);
+        }
+    }
+
+    console.log(`[Backfill] Loaded ${wfcdByExactName.size} items from @wfcd/items library`);
+
+    // Find all DB items missing a uniqueName
+    const itemsToUpdate = await collections.items
+        .find({ $or: [{ uniqueName: { $exists: false } }, { uniqueName: null }, { uniqueName: "" }] })
+        .toArray();
+
+    console.log(`[Backfill] Found ${itemsToUpdate.length} items without uniqueName`);
+
+    let matched = 0;
+    let unmatched = 0;
+    const unmatchedNames: string[] = [];
+
+    for (const dbItem of itemsToUpdate) {
+        const itemName = (dbItem as any).name as string;
+        if (!itemName) {
+            unmatched++;
+            continue;
+        }
+
+        const wfcdMatch = findWfcdMatch(itemName, wfcdByExactName, wfcdByNormalized, allWfcdItems);
+
+        if (wfcdMatch) {
+            await collections.items.updateOne(
+                { _id: dbItem._id },
+                { $set: { uniqueName: wfcdMatch.uniqueName } }
+            );
+            matched++;
+        } else {
+            unmatched++;
+            unmatchedNames.push(itemName);
+        }
+    }
+
+    console.log(`[Backfill] Results: ${matched} matched, ${unmatched} unmatched`);
+    if (unmatchedNames.length > 0) {
+        console.log(`[Backfill] Unmatched items: ${unmatchedNames.join(", ")}`);
+    }
+
+    return { total: itemsToUpdate.length, matched, unmatched, unmatchedNames };
 }

@@ -8,11 +8,14 @@ export async function seedDBManualHttp(request: HttpRequest, context: Invocation
     context.log(`[Manual] Seed DB triggered at ${new Date().toISOString()}`);
 
     try {
-        await seedDB();
+        const backfillResult = await seedDB();
         return {
             status: 201,
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ message: "Database seeded successfully" }),
+            body: JSON.stringify({
+                message: "Database seeded and unique names backfilled",
+                backfill: backfillResult,
+            }),
         };
     } catch (error) {
         context.error("[Manual] Seed DB failed:", error);
