@@ -6,7 +6,7 @@
  */
 import { fetchWorldStateTrader } from "./worldStateService";
 
-const BARO_API_URL = "https://api.warframestat.us/pc/voidTrader/";
+const BARO_API_URL = "https://api.warframestat.us/pc/voidTraders/";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
