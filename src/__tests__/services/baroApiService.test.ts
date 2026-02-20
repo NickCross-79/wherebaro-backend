@@ -229,7 +229,9 @@ describe("baroApiService", () => {
       mockFetch.mockResolvedValueOnce({ ok: false, status: 500, statusText: "Error" });
       mockFetchWorldStateTrader.mockRejectedValueOnce(new Error("No VoidTrader data found in world state"));
 
-      await expect(fetchBaroData()).rejects.toThrow("Warframestat API error: 500 Error");
+      await expect(fetchBaroData()).rejects.toThrow(
+        "Both Baro APIs failed — Primary: Warframestat API error: 500 Error | Fallback: No VoidTrader data found in world state"
+      );
     });
   });
 

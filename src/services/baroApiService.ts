@@ -111,7 +111,9 @@ export async function fetchBaroData(): Promise<BaroApiResponse> {
             return fallback;
         } catch (fallbackError) {
             console.error("[Baro API] World state fallback also failed:", fallbackError);
-            throw primaryError; // Re-throw the original error
+            const primaryMsg = primaryError instanceof Error ? primaryError.message : String(primaryError);
+            const fallbackMsg = fallbackError instanceof Error ? fallbackError.message : String(fallbackError);
+            throw new Error(`Both Baro APIs failed — Primary: ${primaryMsg} | Fallback: ${fallbackMsg}`);
         }
     }
 }
