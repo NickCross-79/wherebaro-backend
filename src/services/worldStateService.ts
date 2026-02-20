@@ -8,6 +8,28 @@ import { normalizeItemType, resolveItemName } from "../utils/wfcdItems";
 const WORLDSTATE_URL = "https://api.warframe.com/cdn/worldState.php";
 
 /**
+ * Maps internal world-state node IDs to human-readable relay names.
+ * These are the nodes where Baro Ki'Teer can appear.
+ */
+const NODE_TO_RELAY: Record<string, string> = {
+    MercuryHUB: "Larunda Relay (Mercury)",
+    VenusHUB: "Vesper Relay (Venus)",
+    EarthHUB: "Strata Relay (Earth)",
+    SaturnHUB: "Kronia Relay (Saturn)",
+    EuropaHUB: "Leonov Relay (Europa)",
+    PlutoHUB: "Orcus Relay (Pluto)",
+    ErisHUB: "Kuiper Relay (Eris)",
+};
+
+/**
+ * Resolves a world-state node ID to a human-readable relay name.
+ * Falls back to the raw node string if unknown.
+ */
+function resolveRelayName(node: string): string {
+    return NODE_TO_RELAY[node] || node;
+}
+
+/**
  * Parses a MongoDB Extended JSON date field into an ISO string.
  * Handles both `{ $date: { $numberLong: "..." } }` and plain timestamps.
  */
@@ -42,7 +64,7 @@ export async function fetchWorldStateTrader(): Promise<WorldStateTrader> {
         activation: parseDate(rawTrader.Activation),
         expiry: parseDate(rawTrader.Expiry),
         character: rawTrader.Character,
-        location: rawTrader.Node || "",
+        location: resolveRelayName(rawTrader.Node || ""),
         inventory: (rawTrader.Manifest || []).map((item: any) => ({
             uniqueName: normalizeItemType(item.ItemType || ""),
             item: resolveItemName(item.ItemType || ""),
