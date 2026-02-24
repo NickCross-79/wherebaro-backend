@@ -11,6 +11,8 @@ import {
     buildWfcdNameMaps,
     findWfcdMatch,
 } from "../utils/wfcdItems";
+import generate from "../lib/mod-generator/generator";
+import { storeTempModImage, MOD_IMAGE_SENTINEL } from "./tempModImageService";
 
 const WF_CDN_BASE = "https://cdn.warframestat.us/img";
 
@@ -30,11 +32,13 @@ async function findItemBySuffix(suffix: string) {
 /**
  * Resolves a Baro API inventory item to an existing DB item, or creates a new one.
  * Uses uniqueName suffix matching, falling back to @wfcd/items for metadata.
+ * @param isNewItem - true when this item was not in the DB before this Baro visit;
+ *                    triggers mod image generation for newly introduced mods.
  */
 async function resolveOrInsertItem(
     entry: BaroApiInventoryItem,
     today: string,
-    isFirstItem: boolean = false
+    isNewItem: boolean = false
 ): Promise<ObjectId | null> {
     if (!collections.items) {
         throw new Error("Items collection not initialized");
@@ -75,7 +79,15 @@ async function resolveOrInsertItem(
     // Look up in @wfcd/items for metadata
     const wfcdItem = lookupWfcdItem(suffix);
     if (wfcdItem) {
-        const imageUrl = wfcdItem.imageName ? `${WF_CDN_BASE}/${wfcdItem.imageName}` : "";
+        // If this is the new Baro mod item and the wiki won't have an image yet,
+        // generate one locally and store it on the `current` document. The item's
+        // image field is set to a sentinel so fetchCurrent can substitute the
+        // generated image until the wiki sync job replaces it with the official one.
+        const isNewMod = isNewItem && wfcdItem.category?.includes("Mod");
+        const imageUrl = isNewMod
+            ? MOD_IMAGE_SENTINEL
+            : (wfcdItem.imageName ? `${WF_CDN_BASE}/${wfcdItem.imageName}` : "");
+
         const newItem = new Item(
             wfcdItem.name,
             imageUrl,
@@ -93,77 +105,91 @@ async function resolveOrInsertItem(
 
         const result = await collections.items.insertOne(newItem as any);
         console.log(`[Item Service] Inserted new item: "${wfcdItem.name}" (${wfcdItem.uniqueName})`);
+
+        if (isNewMod) {
+            // Generate mod image and persist it in tempModImages (best-effort).
+            // The document references this item's _id so fetchCurrent can look it up
+            // and serve a data URI to the frontend until the wiki sync provides the real image.
+            try {
+                const imageBuffer = await generate(wfcdItem, { format: "png" }, 0);
+                if (imageBuffer) {
+                    await storeTempModImage(result.insertedId, imageBuffer.toString("base64"));
+                    console.log(`[Item Service] Generated and stored temp mod image for new item: "${wfcdItem.name}"`);
+                } else {
+                    console.warn(`[Item Service] Mod image generation returned empty result for "${wfcdItem.name}"`);
+                }
+            } catch (err) {
+                console.error(`[Item Service] Failed to generate mod image for "${wfcdItem.name}":`, err);
+            }
+        }
+
         return result.insertedId;
     }
 
     // Unresolved — log for manual review
     console.warn(`[Item Service] Unknown item: "${entry.item}" (${entry.uniqueName})`);
-    await logUnknownItem(entry, isFirstItem);
+    await logUnknownItem(entry, isNewItem);
     return null;
 }
 
 /**
- * Identifies and inserts the new item from a Baro visit.
+ * Identifies all genuinely new items in a Baro inventory by comparing every
+ * non-ignored entry against the database in a single batch query.
  *
- * The first item in the API inventory array is typically the new item.
- * This function checks whether that item's uniqueName already exists in the DB:
- * - If it doesn't → it's genuinely new, insert it directly.
- * - If it does → the new item is elsewhere in the list. Cross-reference all
- *   API uniqueNames against the DB to find the one with no match, then insert that.
+ * Strategy:
+ * 1. Build a regex $or query for all uniqueName suffixes to find existing items.
+ * 2. Any entry whose suffix has no DB match is a candidate new item.
+ * 3. For candidates, also check the name-based fallback (items in DB that have
+ *    no uniqueName yet) — if that matches, the item already exists.
  *
- * @returns Map of uniqueName → ObjectId for items that were handled (inserted),
- *          so resolveBaroInventory can collect IDs without re-querying.
+ * @returns Set of uniqueNames that are genuinely new (not in the DB yet).
  */
-async function insertNewItem(
-    inventory: BaroApiInventoryItem[],
-    today: string
-): Promise<Map<string, ObjectId>> {
+async function identifyNewItems(
+    nonIgnored: BaroApiInventoryItem[]
+): Promise<Set<string>> {
     if (!collections.items) {
         throw new Error("Items collection not initialized");
     }
 
-    const handled = new Map<string, ObjectId>();
-    const nonIgnored = inventory.filter((e) => !isIgnoredBaroItem(e.item));
-    if (nonIgnored.length === 0) return handled;
+    const newUniqueNames = new Set<string>();
+    if (nonIgnored.length === 0) return newUniqueNames;
 
-    const firstEntry = nonIgnored[0];
-    const firstSuffix = getUniqueNameSuffix(firstEntry.uniqueName);
+    const suffixes = nonIgnored.map((e) => getUniqueNameSuffix(e.uniqueName));
 
-    // Check if the first item's uniqueName is already in the DB
-    const firstMatch = await findItemBySuffix(firstSuffix);
+    // Batch query — find all DB items whose uniqueName ends with any of the suffixes
+    const existing = await collections.items
+        .find({ $or: suffixes.map((s) => ({ uniqueName: { $regex: new RegExp(`/${s}$`) } })) })
+        .project({ uniqueName: 1 })
+        .toArray();
 
-    if (!firstMatch) {
-        // First item is genuinely new — insert it via the normal path
-        console.log(`[Item Service] First inventory item "${firstEntry.item}" is new, inserting...`);
-        const itemId = await resolveOrInsertItem(firstEntry, today, true);
-        if (itemId) handled.set(firstEntry.uniqueName, itemId);
-        return handled;
-    }
+    const foundSuffixes = new Set(existing.map((i: any) => getUniqueNameSuffix(i.uniqueName)));
 
-    // First item already exists — the new item is somewhere else.
-    // Cross-reference all API items against the DB to find the unmatched one.
-    console.log(`[Item Service] First inventory item "${firstEntry.item}" already exists, searching for the actual new item...`);
+    // Candidates: not matched by suffix — may still exist via name-based fallback
+    const candidates = nonIgnored.filter((e) => !foundSuffixes.has(getUniqueNameSuffix(e.uniqueName)));
 
-    for (const entry of nonIgnored) {
-        const suffix = getUniqueNameSuffix(entry.uniqueName);
-        const exists = await findItemBySuffix(suffix);
-
-        if (!exists) {
-            console.log(`[Item Service] Found actual new item: "${entry.item}" (${entry.uniqueName})`);
-            const itemId = await resolveOrInsertItem(entry, today, true);
-            if (itemId) handled.set(entry.uniqueName, itemId);
-            return handled;
+    for (const entry of candidates) {
+        const nameMatch = await collections.items.findOne({
+            uniqueName: { $in: [null, undefined, ""] },
+            name: entry.item,
+        });
+        if (!nameMatch) {
+            newUniqueNames.add(entry.uniqueName);
         }
     }
 
-    console.log(`[Item Service] No new items detected in this Baro visit`);
-    return handled;
+    if (newUniqueNames.size > 0) {
+        console.log(`[Item Service] Detected ${newUniqueNames.size} new item(s) this Baro visit`);
+    } else {
+        console.log(`[Item Service] No new items detected in this Baro visit`);
+    }
+
+    return newUniqueNames;
 }
 
 /**
  * Logs an unresolved inventory item to the unknownItems collection.
  */
-async function logUnknownItem(entry: BaroApiInventoryItem, isFirstItem: boolean): Promise<void> {
+async function logUnknownItem(entry: BaroApiInventoryItem, isNewItem: boolean): Promise<void> {
     if (!collections.unknownItems) {
         console.warn(`[Item Service] unknownItems collection unavailable, skipping "${entry.item}"`);
         return;
@@ -178,14 +204,14 @@ async function logUnknownItem(entry: BaroApiInventoryItem, isFirstItem: boolean)
                     uniqueName: entry.uniqueName,
                     ducats: entry.ducats,
                     credits: entry.credits,
-                    isNewItem: isFirstItem,
+                    isNewItem: isNewItem,
                     lastSeen: new Date().toISOString(),
                 },
                 $setOnInsert: { firstSeen: new Date().toISOString() },
             },
             { upsert: true }
         );
-        console.log(`[Item Service] Logged unknown item: "${entry.item}"${isFirstItem ? " (NEW)" : ""}`);
+        console.log(`[Item Service] Logged unknown item: "${entry.item}"${isNewItem ? " (NEW)" : ""}`);
     } catch (error) {
         console.error(`[Item Service] Failed to log unknown item "${entry.item}":`, error);
     }
@@ -234,8 +260,10 @@ export async function resolveBaroInventory(inventory: BaroApiInventoryItem[]): P
     const unmatchedItems: string[] = [];
     const ignoredItems: string[] = [];
 
-    // First pass: identify and insert the new item for this Baro visit
-    const handledItems = await insertNewItem(inventory, today);
+    const nonIgnored = inventory.filter((e) => !isIgnoredBaroItem(e.item));
+
+    // Batch-compare all inventory uniqueNames against the DB to find every new item
+    const newUniqueNames = await identifyNewItems(nonIgnored);
 
     for (const entry of inventory) {
         if (isIgnoredBaroItem(entry.item)) {
@@ -243,14 +271,8 @@ export async function resolveBaroInventory(inventory: BaroApiInventoryItem[]): P
             continue;
         }
 
-        // Use ID from insertNewItem if already handled
-        const handledId = handledItems.get(entry.uniqueName);
-        if (handledId) {
-            inventoryIds.push(handledId);
-            continue;
-        }
-
-        const itemId = await resolveOrInsertItem(entry, today, false);
+        const isNewItem = newUniqueNames.has(entry.uniqueName);
+        const itemId = await resolveOrInsertItem(entry, today, isNewItem);
         if (itemId) inventoryIds.push(itemId);
         else unmatchedItems.push(entry.item);
     }

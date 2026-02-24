@@ -1,5 +1,7 @@
 import { fetchAllItems } from "../services/itemService";
+import { resolveModImageSentinels } from "../services/tempModImageService";
 
 export async function getAllItemsJob() {
-    return fetchAllItems();
+    const items = await fetchAllItems();
+    return resolveModImageSentinels(items);
 }
