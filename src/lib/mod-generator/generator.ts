@@ -1,8 +1,8 @@
-import { createCanvas } from '@napi-rs/canvas';
 import { backgroundImage, bottomImage, horizantalPad, verticalPad } from './drawers';
 import { exportCanvas, getBackground, getFrame, getTier, modRarityMap, registerFonts } from './utils';
 
 const generate = async (mod: any, output: any = { format: 'png' }, rank?: number, image?: string): Promise<Buffer | undefined> => {
+    const { createCanvas } = require('@napi-rs/canvas');
     const tier = getTier(mod);
     const isRiven = tier === modRarityMap.riven;
     const canvas = createCanvas(isRiven ? 292 : 256, 512);

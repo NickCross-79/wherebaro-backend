@@ -1,10 +1,10 @@
-import { createCanvas, loadImage } from '@napi-rs/canvas';
 import { fetchPolarity, fetchModPiece, textColor, wrapText, modRarityMap, modDescription, flip, getTier } from './utils';
 
 export const verticalPad = 70;
 export const horizantalPad = 7;
 
 const drawPolarity = async (tier: string, polarity: string): Promise<any> => {
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
     const image = await fetchPolarity(polarity);
     const size = 32;
     const canvas = createCanvas(size, size);
@@ -17,6 +17,7 @@ const drawPolarity = async (tier: string, polarity: string): Promise<any> => {
 };
 
 export const backerImage = async (props: any): Promise<any> => {
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
     const { backer, tier, base, polarity, rank } = props;
     const canvas = createCanvas(backer.width, backer.height);
     const context = canvas.getContext('2d');
@@ -43,6 +44,7 @@ export const backerImage = async (props: any): Promise<any> => {
 };
 
 export const lowerTabImage = async (props: any): Promise<any> => {
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
     const { lowerTab, tier, compatName } = props;
     const canvas = createCanvas(lowerTab.width, lowerTab.height);
     const context = canvas.getContext('2d');
@@ -58,6 +60,7 @@ export const lowerTabImage = async (props: any): Promise<any> => {
 };
 
 export const backgroundImage = async (props: any): Promise<any> => {
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
     const { background, sideLights, backer, lowerTab, bottom, mod, rank, image } = props;
     const tier = getTier(mod);
     const canvas = createCanvas(background.width, background.height);
@@ -108,6 +111,7 @@ export const backgroundImage = async (props: any): Promise<any> => {
 };
 
 export const bottomImage = async (props: any): Promise<any> => {
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
     const { bottom, cornerLights, tier, max, rank } = props;
     const rankSlotEmpty = await fetchModPiece('RankSlotEmpty.png');
     const rankCompleted = await fetchModPiece('RankCompleteLine.png');

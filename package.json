@@ -5,7 +5,8 @@
     "build": "tsc",
     "start": "func start",
     "test": "jest --forceExit --detectOpenHandles",
-    "watch": "tsc -w"
+    "watch": "tsc -w",
+    "postinstall": "npm rebuild @napi-rs/canvas"
   },
   "dependencies": {
     "@azure/cosmos": "^4.9.0",

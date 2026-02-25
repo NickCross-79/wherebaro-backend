@@ -1,7 +1,6 @@
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { readFile, mkdir, writeFile } from 'fs/promises';
-import { GlobalFonts, createCanvas, loadImage } from '@napi-rs/canvas';
 
 const assetPath = join(__dirname, 'assets', 'modFrames');
 
@@ -20,6 +19,7 @@ export const getTier = (mod: any): string => {
 };
 
 export const flip = async (image: any): Promise<any> => {
+    const { createCanvas, loadImage } = require('@napi-rs/canvas');
     const canvas = createCanvas(image.width, image.height);
     const context = canvas.getContext('2d');
     context.translate(image.width, 0);
@@ -37,6 +37,7 @@ const downloadModPiece = async (name: string): Promise<Buffer> => {
 
 export const fetchModPiece = async (name: string): Promise<any> => {
     const filePath = join(assetPath, name);
+    const { loadImage } = require('@napi-rs/canvas');
     if (existsSync(filePath)) {
         const image = await readFile(filePath);
         return loadImage(image);
@@ -70,6 +71,7 @@ export const getBackground = async (tier: string) => {
 
 export const fetchPolarity = async (polarity: string): Promise<any> => {
     const filePath = join(assetPath, `${polarity}.png`);
+    const { loadImage } = require('@napi-rs/canvas');
     if (existsSync(filePath)) {
         const image = await readFile(filePath);
         return loadImage(image);
@@ -113,6 +115,7 @@ export const wrapText = (context: any, text: string, maxWidth: number): string[]
 };
 
 export const registerFonts = (): void => {
+    const { GlobalFonts } = require('@napi-rs/canvas');
     const fontPath = join(__dirname, 'assets', 'fonts');
     GlobalFonts.registerFromPath(join(fontPath, 'Roboto-Light.ttf'), 'Roboto');
     GlobalFonts.registerFromPath(join(fontPath, 'Roboto-Regular.ttf'), 'Roboto');
@@ -136,6 +139,7 @@ export const exportCanvas = async (canvas: any, output: any = { format: 'png' })
     if (quality !== undefined && (quality < 0 || quality > 100)) {
         throw new Error('quality cannot be less than 0 or more than 100');
     }
+    const { createCanvas } = require('@napi-rs/canvas'); // In case needed for canvas instance
     try {
         switch (output.format) {
             case 'png': return await canvas.encode('png');
