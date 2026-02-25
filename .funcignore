@@ -2,10 +2,13 @@
 *.ts
 .git*
 .vscode
-.env
 local.settings.json
 test
 src/__tests__
-src/**/*.ts
-__tests__
+**/__tests__
+**/*.test.ts
+**/*.test.js
+**/*.spec.ts
+**/*.spec.js
 jest.config.ts
+node_modules/.package-lock.json
