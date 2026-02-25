@@ -45,6 +45,7 @@ jobs:
         run: |
           cd ./deploy
           npm install --include=dev
+          npm install @types/node @types/validator --save-dev
 
       # Build in deploy folder
       - name: Build in deploy folder
