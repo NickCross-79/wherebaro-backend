@@ -40,24 +40,23 @@ jobs:
           cp -r dist ./deploy/
           cp dist/src/functions/index.js ./deploy/index.js
 
-      # Install all dependencies in deploy folder
-      - name: Install all dependencies (including dev)
-        run: |
-          cd ./deploy
-          npm install --include=dev
-          npm install @types/node @types/validator --save-dev
+      # Build in root project folder
+      - name: Build in root
+        run: npm run build
 
-      # Build in deploy folder
-      - name: Build in deploy folder
+      # Prepare deployment folder
+      - name: Prepare deployment folder
         run: |
-          cd ./deploy
-          npm run build
+          mkdir -p ./deploy
+          cp host.json package.json package-lock.json ./deploy/
+          cp -r dist ./deploy/
+          cp dist/src/functions/index.js ./deploy/index.js
 
-      # Prune dev dependencies for production
-      - name: Prune dev dependencies
+      # Install production dependencies in deploy folder
+      - name: Install production dependencies
         run: |
           cd ./deploy
-          npm prune --production
+          npm install --production
 
       # List deploy folder contents for verification
       - name: List deploy folder contents
