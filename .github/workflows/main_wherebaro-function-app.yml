@@ -40,11 +40,23 @@ jobs:
           cp -r dist ./deploy/
           cp dist/src/functions/index.js ./deploy/index.js
 
-      # Install production dependencies in deploy folder
-      - name: Install production dependencies
+      # Install all dependencies in deploy folder
+      - name: Install all dependencies
         run: |
           cd ./deploy
-          npm install --production
+          npm install
+
+      # Build in deploy folder
+      - name: Build in deploy folder
+        run: |
+          cd ./deploy
+          npm run build
+
+      # Prune dev dependencies for production
+      - name: Prune dev dependencies
+        run: |
+          cd ./deploy
+          npm prune --production
 
       # List deploy folder contents for verification
       - name: List deploy folder contents
