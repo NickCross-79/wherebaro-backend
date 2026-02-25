@@ -32,11 +32,19 @@ jobs:
       - name: Prune
         run: npm prune --production
 
+      # Prepare deployment package
+      - name: Prepare deployment folder
+        run: |
+          mkdir -p ./deploy/functions
+          cp host.json package.json ./deploy/
+          cp dist/src/functions/api/*.js ./deploy/functions/
+          cp dist/src/functions/manual/*.js ./deploy/functions/
+          cp dist/src/functions/scheduled/*.js ./deploy/functions/
       # Deploy
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
           app-name: wherebaro-function-app
-          package: .
+          package: ./deploy
           respect-funcignore: true
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C176C977065E4DE5B174105C67537BEA }}
