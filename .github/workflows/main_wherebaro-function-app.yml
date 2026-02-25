@@ -38,7 +38,12 @@ jobs:
           mkdir -p ./deploy
           cp host.json package.json ./deploy/
           cp -r dist ./deploy/
-      # Deploy
+
+      # List deploy folder contents for verification
+      - name: List deploy folder contents
+        run: |
+          echo "Deploy folder structure:" && tree ./deploy || ls -R ./deploy
+      # Deploy 
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
         with:
