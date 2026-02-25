@@ -41,10 +41,10 @@ jobs:
           cp dist/src/functions/index.js ./deploy/index.js
 
       # Install all dependencies in deploy folder
-      - name: Install all dependencies
+      - name: Install all dependencies (including dev)
         run: |
           cd ./deploy
-          npm install
+          npm install --include=dev
 
       # Build in deploy folder
       - name: Build in deploy folder
