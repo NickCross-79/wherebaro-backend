@@ -35,11 +35,9 @@ jobs:
       # Prepare deployment package
       - name: Prepare deployment folder
         run: |
-          mkdir -p ./deploy/functions
+          mkdir -p ./deploy
           cp host.json package.json ./deploy/
-          cp dist/src/functions/api/*.js ./deploy/functions/
-          cp dist/src/functions/manual/*.js ./deploy/functions/
-          cp dist/src/functions/scheduled/*.js ./deploy/functions/
+          cp -r dist ./deploy/
       # Deploy
       - name: Deploy to Azure Functions
         uses: Azure/functions-action@v1
