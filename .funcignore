@@ -1,7 +1,8 @@
 *.js.map
 *.ts
 .git*
-.vscode
+.github*
+.vscode*
 local.settings.json
 test
 src/__tests__
@@ -12,3 +13,8 @@ src/__tests__
 **/*.spec.js
 jest.config.ts
 node_modules/.package-lock.json
+node_modules
+src
+jest*
+README*
+LICENSE*
