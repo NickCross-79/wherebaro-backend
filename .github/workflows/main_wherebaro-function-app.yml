@@ -7,7 +7,7 @@ on:
 
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
 
     steps:
       # 1️⃣ Checkout the repo
@@ -22,7 +22,6 @@ jobs:
       - run: |
           npm ci
           npm run build --if-present
-          npm prune --production
 
       # 4️⃣ Deploy to Azure Function App
       - uses: Azure/functions-action@v1

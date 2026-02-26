@@ -26,9 +26,9 @@ jest.mock("../../utils/itemMappings", () => ({
 jest.mock("@wfcd/items", () => {
   return jest.fn().mockImplementation(() => [
     {
-      name: "Primed Flow",
-      uniqueName: "/Lotus/Upgrades/Mods/Fusers/PrimedFlow",
-      imageName: "primed-flow.png",
+      name: "Archwing Rifle Ammo Max",
+      uniqueName: "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert",
+      imageName: "archwing-rifle-ammo-max.png",
       type: "Mod",
       category: "Mods",
     },
@@ -42,11 +42,37 @@ jest.mock("@wfcd/items", () => {
   ]);
 });
 
+// Mock the mod image generator so tests don't attempt real canvas rendering
+jest.mock("../../lib/mod-generator/generator");
+import generate from "../../lib/mod-generator/generator";
+const mockGenerate = generate as unknown as jest.MockedFunction<typeof generate>;
+
+// Mock tempModImageService so storeTempModImage calls are captured
+jest.mock("../../services/tempModImageService", () => ({
+  storeTempModImage: jest.fn().mockResolvedValue(undefined),
+  MOD_IMAGE_SENTINEL: "temp:modImage",
+}));
+import { storeTempModImage } from "../../services/tempModImageService";
+const mockStoreTempModImage = storeTempModImage as jest.MockedFunction<typeof storeTempModImage>;
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function mockItemsCollection(overrides: Record<string, jest.Mock> = {}) {
+/**
+ * Creates a mock `items` collection.
+ * `findResults` is what the batch `.find().project().toArray()` inside
+ * `identifyNewItems` will return — pass the uniqueNames of items that
+ * already exist in the DB so the service knows they are NOT new.
+ */
+function mockItemsCollection(
+  overrides: Record<string, jest.Mock> = {},
+  findResults: any[] = []
+) {
+  const toArray = jest.fn().mockResolvedValue(findResults);
   const col = {
-    find: jest.fn().mockReturnValue({ toArray: jest.fn().mockResolvedValue([]) }),
+    find: jest.fn().mockReturnValue({
+      project: jest.fn().mockReturnValue({ toArray }),
+      toArray,
+    }),
     findOne: jest.fn().mockResolvedValue(null),
     insertOne: jest.fn().mockResolvedValue({ insertedId: new ObjectId() }),
     updateOne: jest.fn().mockResolvedValue({ matchedCount: 1 }),
@@ -67,8 +93,8 @@ function mockUnknownItemsCollection(overrides: Record<string, jest.Mock> = {}) {
 
 function inventoryEntry(overrides: Partial<BaroApiInventoryItem> = {}): BaroApiInventoryItem {
   return {
-    uniqueName: "/Lotus/Upgrades/Mods/Fusers/PrimedFlow",
-    item: "Primed Flow",
+    uniqueName: "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert",
+    item: "Archwing Rifle Ammo Max",
     ducats: 300,
     credits: 175000,
     ...overrides,
@@ -117,9 +143,12 @@ describe("itemService", () => {
   describe("resolveBaroInventory", () => {
     it("resolves existing items by uniqueName suffix match", async () => {
       const existingId = new ObjectId();
-      const col = mockItemsCollection({
-        findOne: jest.fn().mockResolvedValue({ _id: existingId }),
-      });
+      // Pass uniqueName in findResults so identifyNewItems sees this item as
+      // already in the DB and does NOT flag it as new (preventing image gen).
+      const col = mockItemsCollection(
+        { findOne: jest.fn().mockResolvedValue({ _id: existingId }) },
+        [{ uniqueName: "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert" }]
+      );
       mockUnknownItemsCollection();
 
       const result = await resolveBaroInventory([inventoryEntry()]);
@@ -214,21 +243,26 @@ describe("itemService", () => {
       const existingId = new ObjectId();
       const newInsertedId = new ObjectId();
 
-      mockItemsCollection({
-        findOne: jest.fn().mockImplementation((query: any) => {
-          // Match by uniqueName regex — simulate Primed Flow existing in DB
-          const regex = query?.uniqueName?.$regex;
-          if (regex && regex.test("/Lotus/Upgrades/Mods/Fusers/PrimedFlow")) {
-            return Promise.resolve({ _id: existingId });
-          }
-          return Promise.resolve(null);
-        }),
-        insertOne: jest.fn().mockResolvedValue({ insertedId: newInsertedId }),
-      });
+      mockItemsCollection(
+        {
+          findOne: jest.fn().mockImplementation((query: any) => {
+            // Return the existing Archwing mod for uniqueName suffix lookups;
+            // everything else (Grinlok, unknown, name-based fallbacks) → null.
+            const regex = query?.uniqueName?.$regex;
+            if (regex && regex.test("/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert")) {
+              return Promise.resolve({ _id: existingId });
+            }
+            return Promise.resolve(null);
+          }),
+          insertOne: jest.fn().mockResolvedValue({ insertedId: newInsertedId }),
+        },
+        // Batch find result: only the Archwing mod is already in DB
+        [{ uniqueName: "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert" }]
+      );
       mockUnknownItemsCollection();
 
       const result = await resolveBaroInventory([
-        inventoryEntry(), // Primed Flow → existing
+        inventoryEntry(), // Archwing Rifle Ammo Max → existing
         inventoryEntry({ item: "Prisma Grinlok", uniqueName: "/Lotus/Weapons/Tenno/Rifle/PrismaGrinlok" }), // new via wfcd
         inventoryEntry({ item: "Void Surplus", uniqueName: "/Void" }), // ignored
         inventoryEntry({ item: "Alien Widget", uniqueName: "/Lotus/X/Y/Z/NoMatchHere" }), // unknown
@@ -237,6 +271,133 @@ describe("itemService", () => {
       expect(result.inventoryIds).toHaveLength(2);
       expect(result.ignoredItems).toContain("Void Surplus");
       expect(result.unmatchedItems).toContain("Alien Widget");
+    });
+
+    // ── Mod image generation (new Baro mod items) ──────────────────────────
+
+    describe("mod image generation for new mod items", () => {
+      // ArchwingRifleAmmoMaxModExpert is a Mod — the wfcd mock gives it category: "Mods"
+      const modEntry = () => inventoryEntry();
+
+      beforeEach(() => {
+        // Default: generate returns a fake PNG buffer
+        mockGenerate.mockResolvedValue(Buffer.from("fake-png-data") as any);
+        mockStoreTempModImage.mockResolvedValue(undefined);
+      });
+
+      it("inserts the new mod item with MOD_IMAGE_SENTINEL as its image", async () => {
+        const insertedId = new ObjectId();
+        const col = mockItemsCollection({
+          findOne: jest.fn().mockResolvedValue(null),
+          insertOne: jest.fn().mockResolvedValue({ insertedId }),
+        });
+        mockUnknownItemsCollection();
+
+        await resolveBaroInventory([modEntry()]);
+
+        const insertedDoc = col.insertOne.mock.calls[0][0];
+        expect(insertedDoc.image).toBe("temp:modImage");
+      });
+
+      it("calls generate with the wfcd item data when a new mod is inserted", async () => {
+        const insertedId = new ObjectId();
+        mockItemsCollection({
+          findOne: jest.fn().mockResolvedValue(null),
+          insertOne: jest.fn().mockResolvedValue({ insertedId }),
+        });
+        mockUnknownItemsCollection();
+
+        await resolveBaroInventory([modEntry()]);
+
+        expect(mockGenerate).toHaveBeenCalledWith(
+          expect.objectContaining({ name: "Archwing Rifle Ammo Max" }),
+          { format: "png" },
+          0
+        );
+      });
+
+      it("calls storeTempModImage with the inserted _id and the base64-encoded buffer", async () => {
+        const insertedId = new ObjectId();
+        const fakeBuffer = Buffer.from("fake-png-data");
+        mockGenerate.mockResolvedValue(fakeBuffer as any);
+        mockItemsCollection({
+          findOne: jest.fn().mockResolvedValue(null),
+          insertOne: jest.fn().mockResolvedValue({ insertedId }),
+        });
+        mockUnknownItemsCollection();
+
+        await resolveBaroInventory([modEntry()]);
+
+        expect(mockStoreTempModImage).toHaveBeenCalledWith(
+          insertedId,
+          fakeBuffer.toString("base64")
+        );
+      });
+
+      it("does NOT call storeTempModImage when generate returns undefined", async () => {
+        mockGenerate.mockResolvedValue(undefined as any);
+        const insertedId = new ObjectId();
+        mockItemsCollection({
+          findOne: jest.fn().mockResolvedValue(null),
+          insertOne: jest.fn().mockResolvedValue({ insertedId }),
+        });
+        mockUnknownItemsCollection();
+
+        await resolveBaroInventory([modEntry()]);
+
+        expect(mockStoreTempModImage).not.toHaveBeenCalled();
+      });
+
+      it("does not throw and still returns the item id when generate fails", async () => {
+        mockGenerate.mockRejectedValue(new Error("Canvas render failed"));
+        const insertedId = new ObjectId();
+        mockItemsCollection({
+          findOne: jest.fn().mockResolvedValue(null),
+          insertOne: jest.fn().mockResolvedValue({ insertedId }),
+        });
+        mockUnknownItemsCollection();
+
+        const result = await resolveBaroInventory([modEntry()]);
+
+        expect(result.inventoryIds).toHaveLength(1);
+        expect(result.inventoryIds[0]).toEqual(insertedId);
+        expect(mockStoreTempModImage).not.toHaveBeenCalled();
+      });
+
+      it("does NOT generate an image for new non-mod items (e.g. weapons)", async () => {
+        const insertedId = new ObjectId();
+        mockItemsCollection({
+          findOne: jest.fn().mockResolvedValue(null),
+          insertOne: jest.fn().mockResolvedValue({ insertedId }),
+        });
+        mockUnknownItemsCollection();
+
+        // Prisma Grinlok: category "Weapons" — not a mod
+        await resolveBaroInventory([
+          inventoryEntry({
+            item: "Prisma Grinlok",
+            uniqueName: "/Lotus/Weapons/Tenno/Rifle/PrismaGrinlok",
+          }),
+        ]);
+
+        expect(mockGenerate).not.toHaveBeenCalled();
+        expect(mockStoreTempModImage).not.toHaveBeenCalled();
+      });
+
+      it("does NOT generate an image for a mod item that already exists in the DB", async () => {
+        const existingId = new ObjectId();
+        mockItemsCollection(
+          { findOne: jest.fn().mockResolvedValue({ _id: existingId }) },
+          // Batch find tells identifyNewItems this item already exists
+          [{ uniqueName: "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert" }]
+        );
+        mockUnknownItemsCollection();
+
+        await resolveBaroInventory([modEntry()]);
+
+        expect(mockGenerate).not.toHaveBeenCalled();
+        expect(mockStoreTempModImage).not.toHaveBeenCalled();
+      });
     });
   });
 });
