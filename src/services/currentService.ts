@@ -94,5 +94,3 @@ export async function upsertCurrent(
         { upsert: true }
     );
 }
-
-
