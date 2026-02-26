@@ -11,8 +11,6 @@ import {
     buildWfcdNameMaps,
     findWfcdMatch,
 } from "../utils/wfcdItems";
-//import generate from "../lib/mod-generator/generator";
-import { storeTempModImage, MOD_IMAGE_SENTINEL } from "./tempModImageService";
 
 const WF_CDN_BASE = "https://cdn.warframestat.us/img";
 
@@ -85,7 +83,7 @@ async function resolveOrInsertItem(
         // generated image until the wiki sync job replaces it with the official one.
         const isNewMod = isNewItem && wfcdItem.category?.includes("Mod");
         const imageUrl = isNewMod
-            ? MOD_IMAGE_SENTINEL
+            ? ""
             : (wfcdItem.imageName ? `${WF_CDN_BASE}/${wfcdItem.imageName}` : "");
 
         const newItem = new Item(
@@ -105,23 +103,6 @@ async function resolveOrInsertItem(
 
         const result = await collections.items.insertOne(newItem as any);
         console.log(`[Item Service] Inserted new item: "${wfcdItem.name}" (${wfcdItem.uniqueName})`);
-
-        if (isNewMod) {
-            // Generate mod image and persist it in tempModImages (best-effort).
-            // The document references this item's _id so fetchCurrent can look it up
-            // and serve a data URI to the frontend until the wiki sync provides the real image.
-            try {
-                const imageBuffer = "empty"//await generate(wfcdItem, { format: "png" }, 0);
-                if (imageBuffer) {
-                    await storeTempModImage(result.insertedId, imageBuffer.toString(/*"base64"*/));
-                    console.log(`[Item Service] Generated and stored temp mod image for new item: "${wfcdItem.name}"`);
-                } else {
-                    console.warn(`[Item Service] Mod image generation returned empty result for "${wfcdItem.name}"`);
-                }
-            } catch (err) {
-                console.error(`[Item Service] Failed to generate mod image for "${wfcdItem.name}":`, err);
-            }
-        }
 
         return result.insertedId;
     }
