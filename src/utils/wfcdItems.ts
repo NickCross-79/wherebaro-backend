@@ -15,6 +15,7 @@ export interface WfcdItem {
     type?: string;
     category?: string;
     description?: string;
+    levelStats?: any[]; // Used for mods, can be typed more strictly if needed
 }
 
 // ─── Shared Cache ────────────────────────────────────────────────────────────

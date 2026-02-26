@@ -83,7 +83,7 @@ async function resolveOrInsertItem(
         // generate one locally and store it on the `current` document. The item's
         // image field is set to a sentinel so fetchCurrent can substitute the
         // generated image until the wiki sync job replaces it with the official one.
-        const isNewMod = isNewItem && wfcdItem.category?.includes("Mod");
+        const isNewMod = isNewItem && wfcdItem.category?.toLowerCase().includes("mod");
         const imageUrl = isNewMod
             ? MOD_IMAGE_SENTINEL
             : (wfcdItem.imageName ? `${WF_CDN_BASE}/${wfcdItem.imageName}` : "");
@@ -111,7 +111,7 @@ async function resolveOrInsertItem(
             // The document references this item's _id so fetchCurrent can look it up
             // and serve a data URI to the frontend until the wiki sync provides the real image.
             try {
-                const imageBuffer = await generate(wfcdItem, { format: "png" }, 0);
+                const imageBuffer = await generate(wfcdItem, { format: "png" }, wfcdItem.levelStats?.length ? wfcdItem.levelStats.length - 1 : 0);
                 if (imageBuffer) {
                     await storeTempModImage(result.insertedId, imageBuffer.toString("base64"));
                     console.log(`[Item Service] Generated and stored temp mod image for new item: "${wfcdItem.name}"`);
