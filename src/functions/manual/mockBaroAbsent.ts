@@ -5,15 +5,22 @@
  *
  * Use this to simulate a Baro arrival on the frontend:
  * 1. Point frontend's initial fetch at this endpoint
- * 2. Timer counts down, expires
- * 3. Frontend switches to real warframestat.us API — Baro is here
- * 4. Full arrival/polling flow triggers
+ * 2. Timer counts down ARRIVAL_COUNTDOWN_SECONDS, expires
+ * 3. Frontend polls mockGetCurrent until Baro is confirmed active
+ * 4. Frontend fetches final inventory from mockGetBaroActive
+ * 5. Full arrival flow completes using only mock data
+ *
+ * The activation/expiry dates are always overridden at runtime so the
+ * countdown is predictable regardless of what is stored in the DB.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { connectToDatabase, db } from "../../db/database.service";
 
+/** Seconds from now until the simulated Baro arrival fires. */
+const ARRIVAL_COUNTDOWN_SECONDS = 30;
+
 export async function mockBaroAbsentHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
-    context.log(`[Manual] Mock Baro absent triggered at ${new Date().toISOString()}`);
+    context.log(`[Mock Absent] Triggered at ${new Date().toISOString()}`);
 
     try {
         await connectToDatabase();
@@ -21,7 +28,7 @@ export async function mockBaroAbsentHttp(request: HttpRequest, context: Invocati
         const mockDoc = await db.collection("mockCurrent").findOne({});
 
         if (!mockDoc) {
-            context.log("[Mock] No document found in mockCurrent collection");
+            context.log("[Mock Absent] No document found in mockCurrent collection");
             return {
                 status: 404,
                 headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
@@ -29,8 +36,26 @@ export async function mockBaroAbsentHttp(request: HttpRequest, context: Invocati
             };
         }
 
-        const { _id, ...response } = mockDoc;
-        context.log(`[Mock] Returning mock data. Activation: ${response.activation}, active: ${response.active}`);
+        const { _id, activation: rawActivation, expiry: rawExpiry, isActive: _ignored, ...rest } = mockDoc as any;
+
+        // Compute the original visit duration so expiry stays proportional
+        const originalDurationMs =
+            rawActivation && rawExpiry
+                ? new Date(rawExpiry).getTime() - new Date(rawActivation).getTime()
+                : 6 * 24 * 60 * 60 * 1000; // default: 6 days
+
+        const now = new Date();
+        const activation = new Date(now.getTime() + ARRIVAL_COUNTDOWN_SECONDS * 1000);
+        const expiry = new Date(activation.getTime() + originalDurationMs);
+
+        const response = {
+            ...rest,
+            isActive: false,
+            activation: activation.toISOString(),
+            expiry: expiry.toISOString(),
+        };
+
+        context.log(`[Mock Absent] Baro arrives in ${ARRIVAL_COUNTDOWN_SECONDS}s → activation=${response.activation}`);
 
         return {
             status: 200,
@@ -38,7 +63,7 @@ export async function mockBaroAbsentHttp(request: HttpRequest, context: Invocati
             body: JSON.stringify(response),
         };
     } catch (error: any) {
-        context.error(`[Mock] Error fetching mock data: ${error.message}`);
+        context.error(`[Mock Absent] Error: ${error.message}`);
         return {
             status: 500,
             headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
