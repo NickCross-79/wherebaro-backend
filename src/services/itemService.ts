@@ -11,7 +11,6 @@ import {
     buildWfcdNameMaps,
     findWfcdMatch,
 } from "../utils/wfcdItems";
-import generate from "../lib/mod-generator/generator";
 import { storeTempModImage, MOD_IMAGE_SENTINEL } from "./tempModImageService";
 
 const WF_CDN_BASE = "https://cdn.warframestat.us/img";
@@ -111,6 +110,7 @@ async function resolveOrInsertItem(
             // The document references this item's _id so fetchCurrent can look it up
             // and serve a data URI to the frontend until the wiki sync provides the real image.
             try {
+                const { default: generate } = await import("../lib/mod-generator/generator");
                 const imageBuffer = await generate(wfcdItem, { format: "png" }, wfcdItem.levelStats?.length ? wfcdItem.levelStats.length - 1 : 0);
                 if (imageBuffer) {
                     await storeTempModImage(result.insertedId, imageBuffer.toString("base64"));
