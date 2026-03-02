@@ -24,10 +24,8 @@ jobs:
           npm run build --if-present
 
       # 4️⃣ Deploy to Azure Function App
-      - uses: Azure/functions-action@v2
+      - uses: Azure/functions-action@v1
         with:
           app-name: wherebaro-function-app
           package: .
           publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_C176C977065E4DE5B174105C67537BEA }}
-          restart-app: true
-          scm-do-build-during-deployment: false
