@@ -103,7 +103,10 @@ async function resolveOrInsertItem(
             0   // Initial wishlistCount
         );
 
-        const result = await collections.items.insertOne(newItem as any);
+        // Use majority write concern so the document is visible to all replica-set
+        // members before resolveBaroInventory returns. Without this, a full collection
+        // scan (getAllItems) immediately after can miss the new document.
+        const result = await collections.items.insertOne(newItem as any, { writeConcern: { w: "majority" } });
         console.log(`[Item Service] Inserted new item: "${wfcdItem.name}" (${wfcdItem.uniqueName})`);
 
         if (isNewMod) {
