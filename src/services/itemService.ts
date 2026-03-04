@@ -109,11 +109,7 @@ async function resolveOrInsertItem(
             // Generate mod image and persist it in tempModImages (best-effort).
             // The document references this item's _id so fetchCurrent can look it up
             // and serve a data URI to the frontend until the wiki sync provides the real image.
-            // NOTE: Skipped on Azure — @wfcd/mod-generator uses @napi-rs/canvas whose native bindings crash the Node worker
-            // on Azure Windows Consumption plan. WEBSITE_SITE_NAME is set in all Azure App Service envs.
-            if (process.env.WEBSITE_SITE_NAME) {
-                console.warn(`[Item Service] Skipping mod image generation on Azure for "${wfcdItem.name}" — @wfcd/mod-generator is not supported on this host.`);
-            } else try {
+            try {
                 const { default: generate } = await import("@wfcd/mod-generator");
                 const imageBuffer = await generate({ mod: wfcdItem as any, output: { format: "png" }, rank: wfcdItem.levelStats?.length ? wfcdItem.levelStats.length - 1 : 0 });
                 if (imageBuffer) {
