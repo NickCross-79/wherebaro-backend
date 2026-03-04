@@ -31,6 +31,11 @@ jest.mock("../../services/itemService", () => ({
   fetchAllItems: jest.fn().mockResolvedValue([]),
 }));
 
+jest.mock("../../services/tempModImageService", () => ({
+  resolveModImageSentinels: jest.fn().mockImplementation((items) => Promise.resolve(items)),
+  MOD_IMAGE_SENTINEL: "temp:modImage",
+}));
+
 jest.mock("../../services/pushTokenService", () => ({
   registerPushToken: jest.fn().mockResolvedValue({ token: "token-1", isActive: true }),
   removePushToken: jest.fn(),
