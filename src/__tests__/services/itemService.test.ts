@@ -43,9 +43,9 @@ jest.mock("@wfcd/items", () => {
 });
 
 // Mock the mod image generator so tests don't attempt real canvas rendering
-jest.mock("@wfcd/mod-generator");
-import generate from "@wfcd/mod-generator";
-const mockGenerate = generate as unknown as jest.MockedFunction<typeof generate>;
+jest.mock("../../services/modGeneratorLoader");
+import { generateModImage } from "../../services/modGeneratorLoader";
+const mockGenerate = generateModImage as jest.MockedFunction<typeof generateModImage>;
 
 // Mock tempModImageService so storeTempModImage calls are captured
 jest.mock("../../services/tempModImageService", () => ({
@@ -310,11 +310,8 @@ describe("itemService", () => {
         await resolveBaroInventory([modEntry()]);
 
         expect(mockGenerate).toHaveBeenCalledWith(
-          expect.objectContaining({
-            mod: expect.objectContaining({ name: "Archwing Rifle Ammo Max" }),
-            output: { format: "png" },
-            rank: 0,
-          })
+          expect.objectContaining({ name: "Archwing Rifle Ammo Max" }),
+          0
         );
       });
 

@@ -1,0 +1,39 @@
+diff --git a/node_modules/@wfcd/mod-generator/dist/generator.mjs b/node_modules/@wfcd/mod-generator/dist/generator.mjs
+index 67265e4..8c31bf3 100644
+--- a/node_modules/@wfcd/mod-generator/dist/generator.mjs
++++ b/node_modules/@wfcd/mod-generator/dist/generator.mjs
+@@ -2,6 +2,7 @@ import { GlobalFonts, ImageData, createCanvas, loadImage } from "@napi-rs/canvas
+ import { find } from "warframe-items/utilities";
+ import { readFile } from "node:fs/promises";
+ import { join } from "node:path";
++import { fileURLToPath } from "node:url";
+ 
+ //#region src/styling.ts
+ const titleFont = "400 22px \"Roboto\"";
+@@ -23,7 +24,7 @@ const tierColor = {
+ 
+ //#endregion
+ //#region src/utils.ts
+-const assetPath = join(".", "genesis-assets");
++const assetPath = fileURLToPath(new URL(".", import.meta.url));
+ const getTier = (mod) => {
+ 	if (mod.type.includes("Riven")) return modRarityMap.riven;
+ 	if (mod.name.includes("Archon")) return modRarityMap.rare;
+@@ -64,7 +65,7 @@ const getBackground = async (tier) => {
+ 	};
+ };
+ const fetchPolarity = async (polarity) => {
+-	return loadImage(await readFile(join(assetPath, "img", "polarities", `${polarity}.png`)));
++	return loadImage(await readFile(join(assetPath, "polarities", `${polarity}.png`)));
+ };
+ const modDescription = (rank = 0, description, levelStats) => {
+ 	if (description && description.length !== 0) return description;
+@@ -90,7 +91,7 @@ const wrapText = (context, text, maxWidth) => {
+ 	return lines;
+ };
+ const registerFonts = () => {
+-	const fontPath = join(".", "assets", "fonts");
++	const fontPath = join(fileURLToPath(new URL(".", import.meta.url)), "fonts");
+ 	GlobalFonts.registerFromPath(join(fontPath, "Roboto-Light.ttf"), "Roboto");
+ 	GlobalFonts.registerFromPath(join(fontPath, "Roboto-Regular.ttf"), "Roboto");
+ 	GlobalFonts.registerFromPath(join(fontPath, "Roboto-Bold.ttf"), "Roboto");
