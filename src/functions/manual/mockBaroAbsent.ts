@@ -1,20 +1,17 @@
 /**
- * Manual trigger: DEV/TEST ONLY — Returns a warframestat.us-shaped response
- * from the `mockCurrent` collection. Update the document in MongoDB to
- * change mock behavior without redeploying.
+ * Manual trigger: DEV/TEST ONLY — Returns a warframestat.us-shaped absent
+ * response using the real `current` document. Overrides activation/expiry so
+ * the countdown is always ARRIVAL_COUNTDOWN_SECONDS from now.
  *
  * Use this to simulate a Baro arrival on the frontend:
  * 1. Point frontend's initial fetch at this endpoint
  * 2. Timer counts down ARRIVAL_COUNTDOWN_SECONDS, expires
- * 3. Frontend polls mockGetCurrent until Baro is confirmed active
- * 4. Frontend fetches final inventory from mockGetBaroActive
- * 5. Full arrival flow completes using only mock data
- *
- * The activation/expiry dates are always overridden at runtime so the
- * countdown is predictable regardless of what is stored in the DB.
+ * 3. Frontend polls getCurrent until Baro is confirmed active
+ * 4. Full arrival flow completes using only real data
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
-import { connectToDatabase, db } from "../../db/database.service";
+import { connectToDatabase, collections, db } from "../../db/database.service";
+import { ObjectId } from "mongodb";
 
 /** Seconds from now until the simulated Baro arrival fires. */
 const ARRIVAL_COUNTDOWN_SECONDS = 30;
@@ -25,18 +22,17 @@ export async function mockBaroAbsentHttp(request: HttpRequest, context: Invocati
     try {
         await connectToDatabase();
 
-        const mockDoc = await db.collection("mockCurrent").findOne({});
+        const currentDoc = await collections.current!.findOne({});
 
-        if (!mockDoc) {
-            context.log("[Mock Absent] No document found in mockCurrent collection");
+        if (!currentDoc) {
             return {
                 status: 404,
                 headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" },
-                body: JSON.stringify({ error: "No mock data found in mockCurrent collection" }),
+                body: JSON.stringify({ error: "No document found in current collection" }),
             };
         }
 
-        const { _id, activation: rawActivation, expiry: rawExpiry, isActive: _ignored, ...rest } = mockDoc as any;
+        const { activation: rawActivation, expiry: rawExpiry, location, inventory: inventoryIds } = currentDoc as any;
 
         // Compute the original visit duration so expiry stays proportional
         const originalDurationMs =
@@ -48,14 +44,28 @@ export async function mockBaroAbsentHttp(request: HttpRequest, context: Invocati
         const activation = new Date(now.getTime() + ARRIVAL_COUNTDOWN_SECONDS * 1000);
         const expiry = new Date(activation.getTime() + originalDurationMs);
 
+        // Populate ObjectId inventory into warframestat-shaped items
+        let inventory: any[] = [];
+        if (Array.isArray(inventoryIds) && inventoryIds.length > 0) {
+            const ids = inventoryIds.map((id: any) => (id instanceof ObjectId ? id : new ObjectId(id)));
+            const items = await collections.items!.find({ _id: { $in: ids } }).toArray();
+            inventory = items.map((item: any) => ({
+                uniqueName: item.uniqueName || "",
+                item: item.name || "",
+                ducats: item.ducatPrice ?? 0,
+                credits: item.creditPrice ?? 0,
+            }));
+        }
+
         const response = {
-            ...rest,
             isActive: false,
             activation: activation.toISOString(),
             expiry: expiry.toISOString(),
+            location: location || "",
+            inventory,
         };
 
-        context.log(`[Mock Absent] Baro arrives in ${ARRIVAL_COUNTDOWN_SECONDS}s → activation=${response.activation}`);
+        context.log(`[Mock Absent] Baro arrives in ${ARRIVAL_COUNTDOWN_SECONDS}s → activation=${response.activation}, inventory=${inventory.length} items`);
 
         return {
             status: 200,
