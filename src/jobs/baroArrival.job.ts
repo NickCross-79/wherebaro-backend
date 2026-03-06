@@ -10,16 +10,51 @@
  *
  * Services remain single-responsibility — this job handles the workflow.
  */
-import { fetchBaroData, isBaroActive } from "../services/baroApiService";
+import { fetchBaroData, isBaroActive, BaroApiResponse } from "../services/baroApiService";
 import { resolveBaroInventory } from "../services/itemService";
 import { upsertCurrent } from "../services/currentService";
 import { sendBaroArrivalNotification, sendWishlistMatchNotification } from "../services/notificationService";
 import { getWishlistMatchesForCurrentInventory } from "../services/wishlistService";
 
+const INVENTORY_RETRY_ATTEMPTS = 5;
+const INVENTORY_RETRY_DELAY_MS = 5_000; // 5 seconds between retries
+
+/**
+ * Attempts to fetch Baro data with a non-empty inventory.
+ * Retries up to INVENTORY_RETRY_ATTEMPTS times when Baro is active but the
+ * API returns an empty inventory — this happens when the job fires at exactly
+ * the activation timestamp before the upstream API has populated its data.
+ */
+async function fetchBaroDataWithInventoryRetry(): Promise<BaroApiResponse> {
+    for (let attempt = 1; attempt <= INVENTORY_RETRY_ATTEMPTS; attempt++) {
+        const data = await fetchBaroData();
+        const isHere = isBaroActive(data.activation, data.expiry);
+
+        if (!isHere || data.inventory.length > 0) {
+            if (attempt > 1) {
+                console.log(`[Baro Arrival] Got inventory on attempt ${attempt}`);
+            }
+            return data;
+        }
+
+        if (attempt < INVENTORY_RETRY_ATTEMPTS) {
+            console.warn(
+                `[Baro Arrival] Baro is active but API returned empty inventory ` +
+                `(attempt ${attempt}/${INVENTORY_RETRY_ATTEMPTS}). ` +
+                `Retrying in ${INVENTORY_RETRY_DELAY_MS / 1000}s...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, INVENTORY_RETRY_DELAY_MS));
+        }
+    }
+
+    console.warn(`[Baro Arrival] API still returning empty inventory after ${INVENTORY_RETRY_ATTEMPTS} attempts — proceeding with empty inventory`);
+    return fetchBaroData();
+}
+
 export async function baroArrivalJob() {
     console.log("[Baro Arrival] Starting Friday arrival flow...");
 
-    const baroData = await fetchBaroData();
+    const baroData = await fetchBaroDataWithInventoryRetry();
     const isHere = isBaroActive(baroData.activation, baroData.expiry);
 
     // Baro is absent — store inactive status, no notifications
