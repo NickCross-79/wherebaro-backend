@@ -104,7 +104,40 @@ describe("baroArrival.job", () => {
     expect(mockSendArrival).toHaveBeenCalledWith("Orcus Relay");
   });
 
-  it("handles active Baro with empty inventory (still notifies)", async () => {
+  it("retries fetch when active but empty, and succeeds when inventory arrives on 2nd attempt", async () => {
+    jest.useFakeTimers({ doNotFake: ["Date"] });
+    const activeInventory = [{ uniqueName: "/Lotus/Foo", item: "Primed Flow", ducats: 300, credits: 175000 }];
+
+    mockFetchBaroData
+      .mockResolvedValueOnce(
+        baroData({
+          activation: new Date(Date.now() - 3600_000).toISOString(),
+          expiry: new Date(Date.now() + 3600_000).toISOString(),
+          inventory: [],
+        })
+      )
+      .mockResolvedValueOnce(
+        baroData({
+          activation: new Date(Date.now() - 3600_000).toISOString(),
+          expiry: new Date(Date.now() + 3600_000).toISOString(),
+          inventory: activeInventory,
+        })
+      );
+
+    const resultPromise = baroArrivalJob();
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+    jest.useRealTimers();
+
+    expect(result.isActive).toBe(true);
+    expect(result.inventoryCount).toBe(1);
+    expect(result.notificationSent).toBe(true);
+    expect(mockFetchBaroData).toHaveBeenCalledTimes(2);
+    expect(mockResolve).toHaveBeenCalled();
+  });
+
+  it("handles active Baro with empty inventory after all retries exhausted (still notifies)", async () => {
+    jest.useFakeTimers({ doNotFake: ["Date"] });
     mockFetchBaroData.mockResolvedValue(
       baroData({
         activation: new Date(Date.now() - 3600_000).toISOString(),
@@ -113,12 +146,16 @@ describe("baroArrival.job", () => {
       })
     );
 
-    const result = await baroArrivalJob();
+    const resultPromise = baroArrivalJob();
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+    jest.useRealTimers();
 
     expect(result.isActive).toBe(true);
     expect(result.notificationSent).toBe(true);
     expect(result.inventoryCount).toBe(0);
-    expect(mockResolve).not.toHaveBeenCalled(); // No inventory to resolve
+    expect(mockFetchBaroData).toHaveBeenCalledTimes(6); // 5 retry attempts + 1 final call
+    expect(mockResolve).not.toHaveBeenCalled();
     expect(mockSendArrival).toHaveBeenCalled();
   });
 
