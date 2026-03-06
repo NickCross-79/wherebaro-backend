@@ -1,0 +1,28 @@
+{
+  "version": "2.0",
+  "logging": {
+    "applicationInsights": {
+      "samplingSettings": {
+        "isEnabled": false,
+        "maxTelemetryItemsPerSecond": 20
+      }
+    }
+  },
+  "extensionBundle": {
+    "id": "Microsoft.Azure.Functions.ExtensionBundle",
+    "version": "[4.*, 5.0.0)"
+  },
+  "extensions": {
+    "http": {
+      "routePrefix": "",
+      "maxRequestBodySize": 1048576,
+      "cors": {
+        "allowedOrigins": [
+          "https://api.whenbaro.app"
+        ],
+        "allowedMethods": ["GET", "POST", "OPTIONS"],
+        "allowedHeaders": ["Content-Type", "Authorization"]
+      }
+    }
+  }
+}
