@@ -12,6 +12,7 @@
 import { fetchBaroData, isBaroActive } from "../services/baroApiService";
 import { upsertCurrent } from "../services/currentService";
 import { sendBaroDepartureNotification } from "../services/notificationService";
+import { clearAllVotes } from "../services/voteService";
 
 export async function baroDepartureJob() {
     console.log("[Baro Departure] Checking if Baro just left...");
@@ -35,6 +36,7 @@ export async function baroDepartureJob() {
     if (daysUntilNextArrival > 7) {
         console.log(`[Baro Departure] Baro just left! Next arrival in ${Math.round(daysUntilNextArrival)} days.`);
         await sendBaroDepartureNotification();
+        await clearAllVotes();
         return { updated: true, notificationSent: true };
     }
 

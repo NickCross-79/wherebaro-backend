@@ -67,6 +67,21 @@ export async function removeVote(itemId: ObjectId, uid: string): Promise<boolean
 }
 
 /**
+ * Clear all votes after Baro departs.
+ * Wipes the entire votes collection and resets buy/skip arrays on all items.
+ */
+export async function clearAllVotes(): Promise<void> {
+    await connectToDatabase();
+
+    if (!collections.votes) throw new Error("Votes collection not initialized");
+    if (!collections.items) throw new Error("Items collection not initialized");
+
+    await collections.votes.deleteMany({});
+    await collections.items.updateMany({}, { $set: { buy: [], skip: [] } } as any);
+    console.log("[Vote Service] All votes cleared after Baro departure.");
+}
+
+/**
  * Fetch votes for an item.
  * Returns the vote documents so the frontend can check if the current user voted.
  */
