@@ -39,7 +39,7 @@ export const WIKI_EXCLUDED_ITEMS: string[] = [
     "elixis latron chest plate",
     "koi sentinel tail",
     "orokin catalyst",
-    "axi a8"
+    "axi a8 relic"
 ];
 
 /**
