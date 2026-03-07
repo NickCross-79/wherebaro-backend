@@ -225,6 +225,7 @@ async function logUnknownItem(entry: BaroApiInventoryItem, isNewItem: boolean): 
 
 /**
  * Fetches all items from the database.
+ * Aggregates vote counts from the votes collection and merges onto items.
  */
 export async function fetchAllItems(): Promise<Item[]> {
     await connectToDatabase();
@@ -235,10 +236,37 @@ export async function fetchAllItems(): Promise<Item[]> {
 
     const items = await collections.items.find({}).toArray();
 
-    // Strip sensitive push tokens — wishlistCount is stored as its own field
+    // Aggregate vote counts from the votes collection
+    let voteCounts: Record<string, { buyCount: number; skipCount: number }> = {};
+    if (collections.votes) {
+        try {
+            const pipeline = [
+                {
+                    $group: {
+                        _id: "$item_oid",
+                        buyCount: { $sum: { $cond: [{ $eq: ["$voteType", "buy"] }, 1, 0] } },
+                        skipCount: { $sum: { $cond: [{ $eq: ["$voteType", "skip"] }, 1, 0] } },
+                    },
+                },
+            ];
+            const results = await collections.votes.aggregate(pipeline).toArray();
+            for (const r of results) {
+                voteCounts[r._id.toString()] = { buyCount: r.buyCount, skipCount: r.skipCount };
+            }
+        } catch (err) {
+            // Non-critical — items still returned without vote counts
+        }
+    }
+
+    // Strip sensitive push tokens, merge vote counts
     return items.map((item: any) => {
         const { wishlistPushTokens, ...rest } = item;
-        return rest;
+        const vc = voteCounts[item._id.toString()];
+        return {
+            ...rest,
+            buyCount: vc?.buyCount ?? 0,
+            skipCount: vc?.skipCount ?? 0,
+        };
     });
 }
 

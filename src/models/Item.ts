@@ -11,6 +11,8 @@ export default class Item {
         public reviews: string[],
         public uniqueName?: string,
         public wishlistPushTokens?: string[],
-        public wishlistCount: number = 0
+        public wishlistCount: number = 0,
+        public buyCount: number = 0,
+        public skipCount: number = 0
     ) {}
 }
