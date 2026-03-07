@@ -21,13 +21,19 @@ jest.mock("../../services/notificationService", () => ({
   sendBaroDepartureNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
+jest.mock("../../services/voteService", () => ({
+  clearAllVotes: jest.fn().mockResolvedValue(undefined),
+}));
+
 import { fetchBaroData } from "../../services/baroApiService";
 import { upsertCurrent } from "../../services/currentService";
 import { sendBaroDepartureNotification } from "../../services/notificationService";
+import { clearAllVotes } from "../../services/voteService";
 
 const mockFetchBaroData = fetchBaroData as jest.Mock;
 const mockUpsert = upsertCurrent as jest.Mock;
 const mockSendDeparture = sendBaroDepartureNotification as jest.Mock;
+const mockClearAllVotes = clearAllVotes as jest.Mock;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +65,7 @@ describe("baroDeparture.job", () => {
     expect(result.notificationSent).toBe(true);
     expect(result.updated).toBe(true);
     expect(mockSendDeparture).toHaveBeenCalled();
+    expect(mockClearAllVotes).toHaveBeenCalled();
     expect(mockUpsert).toHaveBeenCalledWith(false, expect.any(String), expect.any(String), "Strata Relay");
   });
 
@@ -75,6 +82,7 @@ describe("baroDeparture.job", () => {
     expect(result.notificationSent).toBe(false);
     expect(result.reason).toBe("still-active");
     expect(mockSendDeparture).not.toHaveBeenCalled();
+    expect(mockClearAllVotes).not.toHaveBeenCalled();
     expect(mockUpsert).toHaveBeenCalledWith(true, expect.any(String), expect.any(String), "Strata Relay");
   });
 
@@ -91,6 +99,7 @@ describe("baroDeparture.job", () => {
     expect(result.notificationSent).toBe(false);
     expect(result.reason).toBe("not-here-this-weekend");
     expect(mockSendDeparture).not.toHaveBeenCalled();
+    expect(mockClearAllVotes).not.toHaveBeenCalled();
     expect(mockUpsert).toHaveBeenCalled(); // Still updates DB
   });
 
