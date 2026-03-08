@@ -57,7 +57,7 @@ async function fetchFromWarframestat(): Promise<BaroApiResponse> {
  * Fetches Baro data by parsing the raw Warframe world state.
  * Used as a fallback when the primary Warframestat API is unreliable.
  */
-async function fetchFromWorldState(): Promise<BaroApiResponse> {
+export async function fetchFromWorldState(): Promise<BaroApiResponse> {
     const trader = await fetchWorldStateTrader();
 
     return {

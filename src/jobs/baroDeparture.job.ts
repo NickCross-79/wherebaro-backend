@@ -2,44 +2,85 @@
  * Job: Baro Departure (Sunday)
  *
  * Runs Sunday at Baro's typical departure time.
- * Determines whether Baro was here this weekend and just left,
- * updates the DB to reflect his absence, and sends a departure notification.
- *
- * Uses the biweekly cycle to distinguish "just departed" from
- * "wasn't here this weekend": if the next activation is more than
- * 7 days away, Baro was here and just left.
+ * Flow:
+ *   1. Read the `current` document — if expiry is still in the future, Baro
+ *      hasn't left yet and we bail early.
+ *   2. Baro just left: poll the Baro API until it returns a new (future)
+ *      expiration time, signalling the next visit cycle has been published.
+ *   3. Upsert the `current` document with the new cycle's activation/expiry.
+ *   4. Send the departure notification and clear all votes.
  */
-import { fetchBaroData, isBaroActive } from "../services/baroApiService";
-import { upsertCurrent } from "../services/currentService";
+import { fetchBaroData, fetchFromWorldState, BaroApiResponse } from "../services/baroApiService";
+import { fetchCurrent, upsertCurrent } from "../services/currentService";
 import { sendBaroDepartureNotification } from "../services/notificationService";
 import { clearAllVotes } from "../services/voteService";
+
+const POLL_MAX_ATTEMPTS = 6;
+const POLL_DELAY_MS = 10_000; // 10 seconds between attempts
+
+/**
+ * Polls the Baro API until it returns a new expiry date that is in the future,
+ * indicating the API has been updated with the next visit cycle.
+ */
+async function pollForNextBaroCycle(): Promise<BaroApiResponse> {
+    for (let attempt = 1; attempt <= POLL_MAX_ATTEMPTS; attempt++) {
+        const data = await fetchBaroData();
+
+        if (new Date(data.expiry) > new Date()) {
+            if (attempt > 1) {
+                console.log(`[Baro Departure] Received new cycle data on attempt ${attempt}.`);
+            }
+            return data;
+        }
+
+        if (attempt < POLL_MAX_ATTEMPTS) {
+            console.warn(
+                `[Baro Departure] API still returning expired expiry ` +
+                `(attempt ${attempt}/${POLL_MAX_ATTEMPTS}). ` +
+                `Retrying in ${POLL_DELAY_MS / 1000}s...`
+            );
+            await new Promise((resolve) => setTimeout(resolve, POLL_DELAY_MS));
+        }
+    }
+
+    console.warn(`[Baro Departure] API still returning old expiry after ${POLL_MAX_ATTEMPTS} attempts — falling back to world state.`);
+    try {
+        const worldStateData = await fetchFromWorldState();
+        if (new Date(worldStateData.expiry) > new Date()) {
+            console.log("[Baro Departure] World state fallback returned a valid future expiry.");
+            return worldStateData;
+        }
+        console.warn("[Baro Departure] World state also returned an expired/stale expiry — proceeding with last poll response.");
+    } catch (wsError) {
+        console.error("[Baro Departure] World state fallback failed:", wsError);
+    }
+    return fetchBaroData();
+}
 
 export async function baroDepartureJob() {
     console.log("[Baro Departure] Checking if Baro just left...");
 
-    const baroData = await fetchBaroData();
-    const isHere = isBaroActive(baroData.activation, baroData.expiry);
+    // Check the stored expiry — if it hasn't passed, Baro is still here
+    const current = await fetchCurrent();
+    const expiryPassed = new Date(current.expiry) < new Date();
 
-    // Update the current document regardless (marks inactive if he left)
-    await upsertCurrent(isHere, baroData.activation, baroData.expiry, baroData.location);
-
-    if (isHere) {
-        console.log("[Baro Departure] Baro is still active — has not departed yet.");
-        return { updated: true, notificationSent: false, reason: "still-active" };
+    if (!expiryPassed) {
+        console.log("[Baro Departure] Baro's expiry has not passed yet — he has not departed.");
+        return { updated: false, notificationSent: false, reason: "not-departed-yet" };
     }
 
-    // If next activation is more than 7 days away, Baro was just here
-    // and left (biweekly cycle). If within 7 days, he's arriving soon
-    // and wasn't here this weekend.
-    const daysUntilNextArrival = (new Date(baroData.activation).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
+    console.log("[Baro Departure] Baro has departed. Polling API for next cycle data...");
 
-    if (daysUntilNextArrival > 7) {
-        console.log(`[Baro Departure] Baro just left! Next arrival in ${Math.round(daysUntilNextArrival)} days.`);
-        await sendBaroDepartureNotification();
-        await clearAllVotes();
-        return { updated: true, notificationSent: true };
-    }
+    // Poll the API until it publishes the next visit's activation/expiry
+    const newBaroData = await pollForNextBaroCycle();
 
-    console.log(`[Baro Departure] Baro wasn't here this weekend. Next arrival in ${Math.round(daysUntilNextArrival)} days.`);
-    return { updated: true, notificationSent: false, reason: "not-here-this-weekend" };
+    // Update the DB with the new cycle info (Baro is now inactive)
+    await upsertCurrent(false, newBaroData.activation, newBaroData.expiry, newBaroData.location);
+    console.log(`[Baro Departure] DB updated — next arrival: ${newBaroData.activation}`);
+
+    // Notify users and reset votes
+    await sendBaroDepartureNotification();
+    await clearAllVotes();
+
+    return { updated: true, notificationSent: true };
 }
