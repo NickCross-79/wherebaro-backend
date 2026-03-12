@@ -187,8 +187,8 @@ export async function updateReview(
     if (trimmedContent.length === 0) {
         throw new Error("Review content cannot be empty");
     }
-    if (trimmedContent.length > 250) {
-        throw new Error("Review content cannot exceed 250 characters");
+    if (trimmedContent.length > 500) {
+        throw new Error("Review content cannot exceed 500 characters");
     }
     
     const sanitizedContent = validator.escape(trimmedContent);
