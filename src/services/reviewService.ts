@@ -33,11 +33,9 @@ function validateAndSanitizeReview(user: string, content: string): { user: strin
     if (trimmedContent.length === 0) {
         throw new Error("Review content cannot be empty");
     }
-    if (trimmedContent.length > 250) {
-        throw new Error("Review content cannot exceed 250 characters");
+    if (trimmedContent.length > 500) {
+        throw new Error("Review content cannot exceed 500 characters");
     }
-    
-    // Sanitize content - escape HTML to prevent XSS
     const sanitizedContent = validator.escape(trimmedContent);
     
     return {
