@@ -7,13 +7,11 @@ import { baroDepartureJob } from "../../jobs/baroDeparture.job";
 
 jest.mock("../../services/baroApiService", () => ({
   fetchBaroData: jest.fn(),
-  isBaroActive: jest.fn((activation: string, expiry: string) => {
-    const now = new Date();
-    return now >= new Date(activation) && now <= new Date(expiry);
-  }),
+  fetchFromWorldState: jest.fn(),
 }));
 
 jest.mock("../../services/currentService", () => ({
+  fetchCurrent: jest.fn(),
   upsertCurrent: jest.fn().mockResolvedValue(undefined),
 }));
 
@@ -26,24 +24,33 @@ jest.mock("../../services/voteService", () => ({
 }));
 
 import { fetchBaroData } from "../../services/baroApiService";
-import { upsertCurrent } from "../../services/currentService";
+import { fetchCurrent, upsertCurrent } from "../../services/currentService";
 import { sendBaroDepartureNotification } from "../../services/notificationService";
 import { clearAllVotes } from "../../services/voteService";
 
 const mockFetchBaroData = fetchBaroData as jest.Mock;
+const mockFetchCurrent = fetchCurrent as jest.Mock;
 const mockUpsert = upsertCurrent as jest.Mock;
 const mockSendDeparture = sendBaroDepartureNotification as jest.Mock;
 const mockClearAllVotes = clearAllVotes as jest.Mock;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function baroData(overrides: Record<string, any> = {}) {
+function currentDoc(expiryOffset: number) {
   return {
-    activation: "2025-01-10T14:00:00.000Z",
-    expiry: "2025-01-12T14:00:00.000Z",
+    expiry: new Date(Date.now() + expiryOffset).toISOString(),
+    activation: new Date(Date.now() - 86400_000).toISOString(),
+    location: "Strata Relay",
+    isHere: expiryOffset > 0,
+  };
+}
+
+function nextCycleData(activationOffset = 14 * 86400_000) {
+  return {
+    activation: new Date(Date.now() + activationOffset).toISOString(),
+    expiry: new Date(Date.now() + activationOffset + 2 * 86400_000).toISOString(),
     location: "Strata Relay",
     inventory: [],
-    ...overrides,
   };
 }
 
@@ -52,13 +59,9 @@ function baroData(overrides: Record<string, any> = {}) {
 describe("baroDeparture.job", () => {
   beforeEach(() => jest.clearAllMocks());
 
-  it("sends departure notification when Baro just left (next arrival > 7 days)", async () => {
-    mockFetchBaroData.mockResolvedValue(
-      baroData({
-        activation: new Date(Date.now() + 14 * 86400_000).toISOString(), // 14 days away
-        expiry: new Date(Date.now() + 16 * 86400_000).toISOString(),
-      })
-    );
+  it("sends departure notification when expiry has passed", async () => {
+    mockFetchCurrent.mockResolvedValue(currentDoc(-3600_000)); // expired 1hr ago
+    mockFetchBaroData.mockResolvedValue(nextCycleData());
 
     const result = await baroDepartureJob();
 
@@ -69,42 +72,26 @@ describe("baroDeparture.job", () => {
     expect(mockUpsert).toHaveBeenCalledWith(false, expect.any(String), expect.any(String), "Strata Relay");
   });
 
-  it("does not send when Baro is still active", async () => {
-    mockFetchBaroData.mockResolvedValue(
-      baroData({
-        activation: new Date(Date.now() - 3600_000).toISOString(),
-        expiry: new Date(Date.now() + 3600_000).toISOString(),
-      })
-    );
+  it("does not send when Baro is still active (expiry in future)", async () => {
+    mockFetchCurrent.mockResolvedValue(currentDoc(3600_000)); // expires in 1hr
 
     const result = await baroDepartureJob();
 
     expect(result.notificationSent).toBe(false);
-    expect(result.reason).toBe("still-active");
+    expect(result.reason).toBe("not-departed-yet");
     expect(mockSendDeparture).not.toHaveBeenCalled();
     expect(mockClearAllVotes).not.toHaveBeenCalled();
-    expect(mockUpsert).toHaveBeenCalledWith(true, expect.any(String), expect.any(String), "Strata Relay");
+    expect(mockUpsert).not.toHaveBeenCalled();
   });
 
-  it("does not send when next arrival is within 7 days (Baro wasn't here)", async () => {
-    mockFetchBaroData.mockResolvedValue(
-      baroData({
-        activation: new Date(Date.now() + 5 * 86400_000).toISOString(), // 5 days away
-        expiry: new Date(Date.now() + 7 * 86400_000).toISOString(),
-      })
-    );
-
-    const result = await baroDepartureJob();
-
-    expect(result.notificationSent).toBe(false);
-    expect(result.reason).toBe("not-here-this-weekend");
-    expect(mockSendDeparture).not.toHaveBeenCalled();
-    expect(mockClearAllVotes).not.toHaveBeenCalled();
-    expect(mockUpsert).toHaveBeenCalled(); // Still updates DB
-  });
-
-  it("throws when fetchBaroData fails", async () => {
+  it("throws when fetchBaroData fails after expiry has passed", async () => {
+    mockFetchCurrent.mockResolvedValue(currentDoc(-3600_000)); // expired
     mockFetchBaroData.mockRejectedValue(new Error("API down"));
     await expect(baroDepartureJob()).rejects.toThrow("API down");
+  });
+
+  it("throws when fetchCurrent fails", async () => {
+    mockFetchCurrent.mockRejectedValue(new Error("DB error"));
+    await expect(baroDepartureJob()).rejects.toThrow("DB error");
   });
 });
