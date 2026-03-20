@@ -1,5 +1,5 @@
 /**
- * Scheduled: Baro Departing Soon — Sunday 6:00 AM EST (11:00 UTC)
+ * Scheduled: Baro Departing Soon — Sunday 6:00 AM EDT (10:00 UTC)
  *
  * Sends a heads-up notification ~3 hours before Baro typically leaves.
  */
@@ -18,6 +18,6 @@ export async function baroDepartingSoon(myTimer: Timer, context: InvocationConte
 }
 
 app.timer("baroDepartingSoon", {
-    schedule: "0 0 11 * * Sun",
+    schedule: "0 0 10 * * Sun",
     handler: baroDepartingSoon,
 });

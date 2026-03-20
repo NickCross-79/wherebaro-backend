@@ -1,5 +1,5 @@
 /**
- * Scheduled: Weekly Item Sync — Wednesday 12:00 PM EST (17:00 UTC)
+ * Scheduled: Weekly Item Sync — Wednesday 12:00 PM EDT (16:00 UTC)
  *
  * Scrapes the Warframe wiki and syncs item data into the database.
  */
@@ -18,6 +18,6 @@ export async function syncItemsWeekly(myTimer: Timer, context: InvocationContext
 }
 
 app.timer("syncItemsWeekly", {
-    schedule: "0 0 17 * * Sun",
+    schedule: "0 0 16 * * Sun",
     handler: syncItemsWeekly,
 });
