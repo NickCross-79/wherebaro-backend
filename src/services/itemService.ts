@@ -31,7 +31,7 @@ async function findItemBySuffix(suffix: string) {
 
 /**
  * Resolves a Baro API inventory item to an existing DB item, or creates a new one.
- * Uses uniqueName suffix matching, falling back to @wfcd/items for metadata.
+ * Uses name matching first, falling back to uniqueName suffix, then @wfcd/items for metadata.
  * @param isNewItem - true when this item was not in the DB before this Baro visit;
  *                    triggers mod image generation for newly introduced mods.
  */
@@ -44,9 +44,21 @@ async function resolveOrInsertItem(
         throw new Error("Items collection not initialized");
     }
 
-    const suffix = getUniqueNameSuffix(entry.uniqueName);
+    // Primary: match by name
+    const nameMatch = await collections.items.findOne({ name: entry.item });
 
-    // Try to find existing item by uniqueName suffix
+    if (nameMatch) {
+        const update: any = { $addToSet: { offeringDates: today } };
+        if (!nameMatch.uniqueName) {
+            update.$set = { uniqueName: entry.uniqueName };
+            console.log(`[Item Service] Matched "${entry.item}" by name, backfilled uniqueName: ${entry.uniqueName}`);
+        }
+        await collections.items.updateOne({ _id: nameMatch._id }, update);
+        return nameMatch._id;
+    }
+
+    // Fallback: match by uniqueName suffix
+    const suffix = getUniqueNameSuffix(entry.uniqueName);
     const existingItem = await findItemBySuffix(suffix);
 
     if (existingItem) {
@@ -55,25 +67,6 @@ async function resolveOrInsertItem(
             { $addToSet: { offeringDates: today } }
         );
         return existingItem._id;
-    }
-
-    // No match by uniqueName — try name-based fallback for items missing uniqueName
-    const nameMatch = await collections.items.findOne({
-        uniqueName: { $in: [null, undefined, ""] },
-        name: entry.item,
-    });
-
-    if (nameMatch) {
-        // Found by name — backfill the uniqueName and update offering dates
-        await collections.items.updateOne(
-            { _id: nameMatch._id },
-            {
-                $set: { uniqueName: entry.uniqueName },
-                $addToSet: { offeringDates: today },
-            }
-        );
-        console.log(`[Item Service] Matched "${entry.item}" by name, backfilled uniqueName: ${entry.uniqueName}`);
-        return nameMatch._id;
     }
 
     // Look up in @wfcd/items for metadata
@@ -141,10 +134,10 @@ async function resolveOrInsertItem(
  * non-ignored entry against the database in a single batch query.
  *
  * Strategy:
- * 1. Build a regex $or query for all uniqueName suffixes to find existing items.
- * 2. Any entry whose suffix has no DB match is a candidate new item.
- * 3. For candidates, also check the name-based fallback (items in DB that have
- *    no uniqueName yet) — if that matches, the item already exists.
+ * 1. Batch query by name to find existing items.
+ * 2. Any entry whose name has no DB match is a candidate new item.
+ * 3. For candidates, batch-check by uniqueName suffix as a fallback —
+ *    if that matches, the item already exists.
  *
  * @returns Set of uniqueNames that are genuinely new (not in the DB yet).
  */
@@ -158,26 +151,31 @@ async function identifyNewItems(
     const newUniqueNames = new Set<string>();
     if (nonIgnored.length === 0) return newUniqueNames;
 
-    const suffixes = nonIgnored.map((e) => getUniqueNameSuffix(e.uniqueName));
-
-    // Batch query — find all DB items whose uniqueName ends with any of the suffixes
-    const existing = await collections.items
-        .find({ $or: suffixes.map((s) => ({ uniqueName: { $regex: new RegExp(`/${s}$`) } })) })
-        .project({ uniqueName: 1 })
+    // Primary batch query — find all DB items whose name matches any inventory item
+    const names = nonIgnored.map((e) => e.item).filter(Boolean);
+    const existingByName = await collections.items
+        .find({ name: { $in: names } })
+        .project({ name: 1 })
         .toArray();
 
-    const foundSuffixes = new Set(existing.map((i: any) => getUniqueNameSuffix(i.uniqueName)));
+    const foundNames = new Set(existingByName.map((i: any) => i.name));
 
-    // Candidates: not matched by suffix — may still exist via name-based fallback
-    const candidates = nonIgnored.filter((e) => !foundSuffixes.has(getUniqueNameSuffix(e.uniqueName)));
+    // Candidates: not matched by name — may still exist via uniqueName suffix fallback
+    const candidates = nonIgnored.filter((e) => !foundNames.has(e.item));
 
-    for (const entry of candidates) {
-        const nameMatch = await collections.items.findOne({
-            uniqueName: { $in: [null, undefined, ""] },
-            name: entry.item,
-        });
-        if (!nameMatch) {
-            newUniqueNames.add(entry.uniqueName);
+    if (candidates.length > 0) {
+        const suffixes = candidates.map((e) => getUniqueNameSuffix(e.uniqueName));
+        const existingBySuffix = await collections.items
+            .find({ $or: suffixes.map((s) => ({ uniqueName: { $regex: new RegExp(`/${s}$`) } })) })
+            .project({ uniqueName: 1 })
+            .toArray();
+
+        const foundSuffixes = new Set(existingBySuffix.map((i: any) => getUniqueNameSuffix(i.uniqueName)));
+
+        for (const entry of candidates) {
+            if (!foundSuffixes.has(getUniqueNameSuffix(entry.uniqueName))) {
+                newUniqueNames.add(entry.uniqueName);
+            }
         }
     }
 
