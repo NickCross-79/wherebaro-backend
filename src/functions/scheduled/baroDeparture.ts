@@ -1,5 +1,5 @@
 /**
- * Scheduled: Baro Departure — Sunday 9:00:10 AM EST (14:00:10 UTC)
+ * Scheduled: Baro Departure — Sunday 9:00:10 AM EDT (13:00:10 UTC)
  *
  * Checks if Baro just departed, updates the DB, and sends
  * a departure notification if he was here this weekend.
@@ -19,6 +19,6 @@ export async function baroDeparture(myTimer: Timer, context: InvocationContext):
 }
 
 app.timer("baroDeparture", {
-    schedule: "10 0 14 * * Sun",
+    schedule: "10 0 13 * * Sun",
     handler: baroDeparture,
 });
