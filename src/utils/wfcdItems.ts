@@ -30,24 +30,40 @@ export function getWfcdItems(): WfcdItem[] {
     return wfcdItemsCache;
 }
 
-// ─── Suffix Lookup ───────────────────────────────────────────────────────────
+// ─── Key Extraction ──────────────────────────────────────────────────────────
 
 /**
- * Extracts the last segment from a uniqueName path.
- * e.g. "/Lotus/StoreItems/Types/Items/ShipDecos/Foo" → "Foo"
+ * Extracts a comparable key from a uniqueName by stripping the leading
+ * "/Lotus/StoreItems/" prefix (for API paths) or "/Lotus/" prefix (for DB paths).
+ * This allows API paths and DB paths to be matched against each other.
+ *
+ * e.g. "/Lotus/StoreItems/Upgrades/Mods/Shotgun/Expert/WeaponClipMaxModExpert"
+ *       → "Upgrades/Mods/Shotgun/Expert/WeaponClipMaxModExpert"
+ * e.g. "/Lotus/Upgrades/Mods/Shotgun/Expert/WeaponClipMaxModExpert"
+ *       → "Upgrades/Mods/Shotgun/Expert/WeaponClipMaxModExpert"
+ * e.g. "/Lotus/StoreItems/Types/StoreItems/AvatarImages/AvatarImageDrippy"
+ *       → "Types/StoreItems/AvatarImages/AvatarImageDrippy"
+ * e.g. "/Lotus/Types/StoreItems/AvatarImages/AvatarImageDrippy"
+ *       → "Types/StoreItems/AvatarImages/AvatarImageDrippy"
  */
-export function getUniqueNameSuffix(uniqueName: string): string {
-    return uniqueName.split("/").pop() || uniqueName;
+export function getUniqueNameKey(uniqueName: string): string {
+    const storeItemsPrefix = "/Lotus/StoreItems/";
+    const idx = uniqueName.indexOf(storeItemsPrefix);
+    if (idx !== -1) return uniqueName.slice(idx + storeItemsPrefix.length);
+    const lotusPrefix = "/Lotus/";
+    const idx2 = uniqueName.indexOf(lotusPrefix);
+    if (idx2 !== -1) return uniqueName.slice(idx2 + lotusPrefix.length);
+    return uniqueName;
 }
 
 /**
- * Looks up a Warframe item by the last segment of its uniqueName
- * using the @wfcd/items library.
+ * Looks up a Warframe item by comparing uniqueName keys using the @wfcd/items library.
  */
-export function lookupWfcdItem(suffix: string): WfcdItem | null {
+export function lookupWfcdItem(uniqueName: string): WfcdItem | null {
+    const key = getUniqueNameKey(uniqueName);
     return (
         getWfcdItems().find(
-            (item) => item.uniqueName?.endsWith(`/${suffix}`)
+            (item) => getUniqueNameKey(item.uniqueName) === key
         ) ?? null
     );
 }

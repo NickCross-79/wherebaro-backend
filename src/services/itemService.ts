@@ -5,7 +5,7 @@ import { isIgnoredBaroItem } from "../utils/itemMappings";
 import { BaroApiInventoryItem } from "./baroApiService";
 import {
     WfcdItem,
-    getUniqueNameSuffix,
+    getUniqueNameKey,
     lookupWfcdItem,
     getWfcdItems,
     buildWfcdNameMaps,
@@ -19,11 +19,11 @@ const WF_CDN_BASE = "https://cdn.warframestat.us/img";
 // ─── DB Lookup ───────────────────────────────────────────────────────────────
 
 /**
- * Finds an existing DB item by uniqueName suffix match.
+ * Finds an existing DB item by exact uniqueName key match.
  */
-async function findItemBySuffix(suffix: string) {
+async function findItemByKey(key: string) {
     return collections.items!.findOne({
-        uniqueName: { $regex: new RegExp(`/${suffix}$`) },
+        uniqueName: `/Lotus/${key}`,
     });
 }
 
@@ -57,9 +57,9 @@ async function resolveOrInsertItem(
         return nameMatch._id;
     }
 
-    // Fallback: match by uniqueName suffix
-    const suffix = getUniqueNameSuffix(entry.uniqueName);
-    const existingItem = await findItemBySuffix(suffix);
+    // Fallback: match by uniqueName key
+    const key = getUniqueNameKey(entry.uniqueName);
+    const existingItem = await findItemByKey(key);
 
     if (existingItem) {
         await collections.items.updateOne(
@@ -70,7 +70,7 @@ async function resolveOrInsertItem(
     }
 
     // Look up in @wfcd/items for metadata
-    const wfcdItem = lookupWfcdItem(suffix);
+    const wfcdItem = lookupWfcdItem(entry.uniqueName);
     if (wfcdItem) {
         // If this is the new Baro mod item and the wiki won't have an image yet,
         // generate one locally and store it on the `current` document. The item's
@@ -164,16 +164,16 @@ async function identifyNewItems(
     const candidates = nonIgnored.filter((e) => !foundNames.has(e.item));
 
     if (candidates.length > 0) {
-        const suffixes = candidates.map((e) => getUniqueNameSuffix(e.uniqueName));
-        const existingBySuffix = await collections.items
-            .find({ $or: suffixes.map((s) => ({ uniqueName: { $regex: new RegExp(`/${s}$`) } })) })
+        const uniqueNames = candidates.map((e) => `/Lotus/${getUniqueNameKey(e.uniqueName)}`);
+        const existingByUniqueName = await collections.items
+            .find({ uniqueName: { $in: uniqueNames } })
             .project({ uniqueName: 1 })
             .toArray();
 
-        const foundSuffixes = new Set(existingBySuffix.map((i: any) => getUniqueNameSuffix(i.uniqueName)));
+        const foundKeys = new Set(existingByUniqueName.map((i: any) => getUniqueNameKey(i.uniqueName)));
 
         for (const entry of candidates) {
-            if (!foundSuffixes.has(getUniqueNameSuffix(entry.uniqueName))) {
+            if (!foundKeys.has(getUniqueNameKey(entry.uniqueName))) {
                 newUniqueNames.add(entry.uniqueName);
             }
         }
