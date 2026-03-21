@@ -141,13 +141,22 @@ describe("itemService", () => {
   // ── resolveBaroInventory ───────────────────────────────────────────────────
 
   describe("resolveBaroInventory", () => {
-    it("resolves existing items by uniqueName suffix match", async () => {
+    it("resolves existing items by uniqueName key match", async () => {
       const existingId = new ObjectId();
+      const existingUniqueName = "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert";
       // Pass uniqueName in findResults so identifyNewItems sees this item as
       // already in the DB and does NOT flag it as new (preventing image gen).
+      // findOne returns null for name queries and the existing item for key queries.
       const col = mockItemsCollection(
-        { findOne: jest.fn().mockResolvedValue({ _id: existingId }) },
-        [{ uniqueName: "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert" }]
+        {
+          findOne: jest.fn().mockImplementation((query: any) => {
+            if (query?.uniqueName === existingUniqueName) {
+              return Promise.resolve({ _id: existingId, uniqueName: existingUniqueName });
+            }
+            return Promise.resolve(null);
+          }),
+        },
+        [{ uniqueName: existingUniqueName }]
       );
       mockUnknownItemsCollection();
 
@@ -246,10 +255,9 @@ describe("itemService", () => {
       mockItemsCollection(
         {
           findOne: jest.fn().mockImplementation((query: any) => {
-            // Return the existing Archwing mod for uniqueName suffix lookups;
+            // Return the existing Archwing mod for uniqueName key lookups;
             // everything else (Grinlok, unknown, name-based fallbacks) → null.
-            const regex = query?.uniqueName?.$regex;
-            if (regex && regex.test("/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert")) {
+            if (query?.uniqueName === "/Lotus/Upgrades/Mods/Archwing/Rifle/Expert/ArchwingRifleAmmoMaxModExpert") {
               return Promise.resolve({ _id: existingId });
             }
             return Promise.resolve(null);
