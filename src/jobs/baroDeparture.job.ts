@@ -57,7 +57,7 @@ async function pollForNextBaroCycle(): Promise<BaroApiResponse> {
     return fetchBaroData();
 }
 
-export async function baroDepartureJob({ sendNotification = true }: { sendNotification?: boolean } = {}) {
+export async function baroDepartureJob() {
     console.log("[Baro Departure] Checking if Baro just left...");
 
     // Check the stored expiry — if it hasn't passed, Baro is still here
@@ -72,11 +72,7 @@ export async function baroDepartureJob({ sendNotification = true }: { sendNotifi
     console.log("[Baro Departure] Baro has departed. Sending departure notification and clearing votes...");
 
     // Notify users and reset votes first — these don't require next-cycle API data
-    if (sendNotification) {
-        await sendBaroDepartureNotification();
-    } else {
-        console.log("[Baro Departure] Skipping notification (sendNotification=false).");
-    }
+    await sendBaroDepartureNotification();
     await clearAllVotes();
 
     console.log("[Baro Departure] Polling API for next cycle data...");
@@ -91,8 +87,8 @@ export async function baroDepartureJob({ sendNotification = true }: { sendNotifi
         console.log(`[Baro Departure] DB updated — next arrival: ${newBaroData.activation}`);
     } catch (apiError) {
         console.error("[Baro Departure] Failed to fetch next cycle data from all APIs — DB not updated:", apiError);
-        return { updated: false, notificationSent: sendNotification };
+        return { updated: false, notificationSent: true };
     }
 
-    return { updated: true, notificationSent: sendNotification };
+    return { updated: true, notificationSent: true };
 }

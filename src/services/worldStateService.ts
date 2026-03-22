@@ -47,7 +47,11 @@ function parseDate(field: any): string {
  * @returns The VoidTrader data from the world state.
  */
 export async function fetchWorldStateTrader(): Promise<WorldStateTrader> {
-    const response = await fetch(WORLDSTATE_URL);
+    const response = await fetch(WORLDSTATE_URL, {
+        headers: {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        },
+    });
     if (!response.ok) {
         throw new Error(`World state API error: ${response.status} ${response.statusText}`);
     }
