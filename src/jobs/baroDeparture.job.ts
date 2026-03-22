@@ -57,7 +57,7 @@ async function pollForNextBaroCycle(): Promise<BaroApiResponse> {
     return fetchBaroData();
 }
 
-export async function baroDepartureJob() {
+export async function baroDepartureJob({ sendNotification = true }: { sendNotification?: boolean } = {}) {
     console.log("[Baro Departure] Checking if Baro just left...");
 
     // Check the stored expiry — if it hasn't passed, Baro is still here
@@ -72,7 +72,11 @@ export async function baroDepartureJob() {
     console.log("[Baro Departure] Baro has departed. Sending departure notification and clearing votes...");
 
     // Notify users and reset votes first — these don't require next-cycle API data
-    await sendBaroDepartureNotification();
+    if (sendNotification) {
+        await sendBaroDepartureNotification();
+    } else {
+        console.log("[Baro Departure] Skipping notification (sendNotification=false).");
+    }
     await clearAllVotes();
 
     console.log("[Baro Departure] Polling API for next cycle data...");
