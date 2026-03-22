@@ -69,18 +69,26 @@ export async function baroDepartureJob() {
         return { updated: false, notificationSent: false, reason: "not-departed-yet" };
     }
 
-    console.log("[Baro Departure] Baro has departed. Polling API for next cycle data...");
+    console.log("[Baro Departure] Baro has departed. Sending departure notification and clearing votes...");
 
-    // Poll the API until it publishes the next visit's activation/expiry
-    const newBaroData = await pollForNextBaroCycle();
-
-    // Update the DB with the new cycle info (Baro is now inactive)
-    await upsertCurrent(false, newBaroData.activation, newBaroData.expiry, newBaroData.location);
-    console.log(`[Baro Departure] DB updated — next arrival: ${newBaroData.activation}`);
-
-    // Notify users and reset votes
+    // Notify users and reset votes first — these don't require next-cycle API data
     await sendBaroDepartureNotification();
     await clearAllVotes();
+
+    console.log("[Baro Departure] Polling API for next cycle data...");
+
+    // Poll the API until it publishes the next visit's activation/expiry.
+    // This is best-effort: a failure here does not undo the notification already sent.
+    try {
+        const newBaroData = await pollForNextBaroCycle();
+
+        // Update the DB with the new cycle info (Baro is now inactive)
+        await upsertCurrent(false, newBaroData.activation, newBaroData.expiry, newBaroData.location);
+        console.log(`[Baro Departure] DB updated — next arrival: ${newBaroData.activation}`);
+    } catch (apiError) {
+        console.error("[Baro Departure] Failed to fetch next cycle data from all APIs — DB not updated:", apiError);
+        return { updated: false, notificationSent: true };
+    }
 
     return { updated: true, notificationSent: true };
 }
