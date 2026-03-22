@@ -91,8 +91,8 @@ export async function baroDepartureJob({ sendNotification = true }: { sendNotifi
         console.log(`[Baro Departure] DB updated — next arrival: ${newBaroData.activation}`);
     } catch (apiError) {
         console.error("[Baro Departure] Failed to fetch next cycle data from all APIs — DB not updated:", apiError);
-        return { updated: false, notificationSent: true };
+        return { updated: false, notificationSent: sendNotification };
     }
 
-    return { updated: true, notificationSent: true };
+    return { updated: true, notificationSent: sendNotification };
 }
