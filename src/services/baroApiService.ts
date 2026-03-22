@@ -8,8 +8,8 @@ import { fetchWorldStateTrader } from "./worldStateService";
 
 const BARO_API_URL = "https://api.warframestat.us/pc/voidTraders/?language=en";
 
-// TODO: Set back to false once Warframestat API is stable
-const WARFRAMESTAT_DISABLED = true;
+// Set WARFRAMESTAT_DISABLED=true in app settings to bypass the primary API temporarily
+const WARFRAMESTAT_DISABLED = process.env.WARFRAMESTAT_DISABLED === "true";
 
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
