@@ -18,6 +18,6 @@ export async function syncItemsWeekly(myTimer: Timer, context: InvocationContext
 }
 
 app.timer("syncItemsWeekly", {
-    schedule: "0 0 16 * * Sun",
+    schedule: "0 0 16 * * Sat",
     handler: syncItemsWeekly,
 });

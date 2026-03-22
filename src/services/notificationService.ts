@@ -23,11 +23,12 @@ function truncate(value: string, maxLength: number = 20): string {
 export async function sendPushNotifications(
   title: string,
   body: string,
-  data?: Record<string, any>
+  data?: Record<string, any>,
+  type?: 'arrival' | 'departure'
 ): Promise<{ success: number; failed: number }> {
   try {
-    // Get all active push tokens
-    const pushTokens = await getActivePushTokens();
+    // Get tokens filtered by notification type preference
+    const pushTokens = await getActivePushTokens(type);
     console.log(`[Notifications] Sending "${title}" to ${pushTokens.length} device(s)`);
 
     if (pushTokens.length === 0) {
@@ -108,7 +109,8 @@ export async function sendBaroArrivalNotification(location: string): Promise<voi
   await sendPushNotifications(
     'Baro Ki\'teer has arrived!',
     `Visit him at ${location}`,
-    { type: 'baro-arrival', location }
+    { type: 'baro-arrival', location },
+    'arrival'
   );
 }
 
@@ -130,7 +132,8 @@ export async function sendBaroDepartureNotification(): Promise<void> {
   await sendPushNotifications(
     'Baro Ki\'teer has departed',
     'Baro has left the relay. See you next time, Tenno!',
-    { type: 'baro-departure' }
+    { type: 'baro-departure' },
+    'departure'
   );
 }
 
