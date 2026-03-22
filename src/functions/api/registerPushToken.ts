@@ -5,7 +5,7 @@ export async function registerPushToken(request: HttpRequest, context: Invocatio
     context.log(`Http function processed request for url "${request.url}"`);
 
     try {
-        const body = await request.json() as { token?: string; deviceId?: string };
+        const body = await request.json() as { token?: string; deviceId?: string; notifyArrival?: boolean; notifyDeparture?: boolean };
 
         if (!body?.token) {
             return {
@@ -21,7 +21,9 @@ export async function registerPushToken(request: HttpRequest, context: Invocatio
         // Register the push token
         const result = await registerPushTokenJob({ 
             token: body.token,
-            deviceId: body.deviceId 
+            deviceId: body.deviceId,
+            notifyArrival: body.notifyArrival,
+            notifyDeparture: body.notifyDeparture,
         });
 
         return {

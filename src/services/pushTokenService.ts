@@ -23,9 +23,13 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
   const existing = await collections.pushTokens?.findOne({ token: data.token });
 
   if (existing) {
+    const updateFields: Record<string, any> = { lastUsed: now, isActive: true };
+    if (typeof data.notifyArrival === 'boolean') updateFields.notifyArrival = data.notifyArrival;
+    if (typeof data.notifyDeparture === 'boolean') updateFields.notifyDeparture = data.notifyDeparture;
+
     await collections.pushTokens?.updateOne(
       { token: data.token },
-      { $set: { lastUsed: now, isActive: true } }
+      { $set: updateFields }
     );
     console.log(`[Push Tokens] Updated existing token for device ${truncate(data.deviceId)}`);
     
@@ -36,6 +40,8 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
       createdAt: existing.createdAt,
       lastUsed: now,
       isActive: true,
+      notifyArrival: updateFields.notifyArrival ?? existing.notifyArrival,
+      notifyDeparture: updateFields.notifyDeparture ?? existing.notifyDeparture,
     };
   }
 
@@ -45,6 +51,8 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
     createdAt: now,
     lastUsed: now,
     isActive: true,
+    notifyArrival: data.notifyArrival !== false,
+    notifyDeparture: data.notifyDeparture !== false,
   };
 
   const result = await collections.pushTokens?.insertOne(newToken);
@@ -57,11 +65,22 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
 }
 
 /**
- * Get all active push tokens
+ * Get all active push tokens, optionally filtered by notification type preference.
+ * Tokens without an explicit preference (legacy) default to receiving all types.
+ * @param type - 'arrival' | 'departure' — filter by that preference; omit for all active tokens
  */
-export async function getActivePushTokens(): Promise<string[]> {
+export async function getActivePushTokens(type?: 'arrival' | 'departure'): Promise<string[]> {
   await connectToDatabase();
-  const tokens = await collections.pushTokens?.find({ isActive: true }).toArray();
+
+  const query: Record<string, any> = { isActive: true };
+  if (type === 'arrival') {
+    // Exclude tokens that have explicitly opted out; missing field = opted in (legacy compat)
+    query.notifyArrival = { $ne: false };
+  } else if (type === 'departure') {
+    query.notifyDeparture = { $ne: false };
+  }
+
+  const tokens = await collections.pushTokens?.find(query).toArray();
   return tokens?.map(t => t.token) || [];
 }
 
