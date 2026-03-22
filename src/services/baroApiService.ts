@@ -8,6 +8,9 @@ import { fetchWorldStateTrader } from "./worldStateService";
 
 const BARO_API_URL = "https://api.warframestat.us/pc/voidTraders/?language=en";
 
+// TODO: Set back to false once Warframestat API is stable
+const WARFRAMESTAT_DISABLED = true;
+
 // ─── Interfaces ──────────────────────────────────────────────────────────────
 
 export interface BaroApiInventoryItem {
@@ -81,6 +84,11 @@ export async function fetchFromWorldState(): Promise<BaroApiResponse> {
  * - Reports Baro as active but returns an empty inventory
  */
 export async function fetchBaroData(): Promise<BaroApiResponse> {
+    if (WARFRAMESTAT_DISABLED) {
+        console.warn("[Baro API] Warframestat API temporarily disabled — using world state directly.");
+        return fetchFromWorldState();
+    }
+
     try {
         const data = await fetchFromWarframestat();
 
