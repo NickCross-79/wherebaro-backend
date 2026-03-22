@@ -9,7 +9,7 @@ export async function baroDepartureManualHttp(request: HttpRequest, context: Inv
     context.log(`[Manual] Baro departure job triggered at ${new Date().toISOString()}`);
 
     try {
-        const result = await baroDepartureJob({ sendNotification: false });
+        const result = await baroDepartureJob();
         return {
             status: 200,
             headers: { "Content-Type": "application/json" },
