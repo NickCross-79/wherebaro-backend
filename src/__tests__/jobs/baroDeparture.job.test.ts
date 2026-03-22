@@ -84,10 +84,17 @@ describe("baroDeparture.job", () => {
     expect(mockUpsert).not.toHaveBeenCalled();
   });
 
-  it("throws when fetchBaroData fails after expiry has passed", async () => {
+  it("still sends notification and returns updated:false when API is down after expiry has passed", async () => {
     mockFetchCurrent.mockResolvedValue(currentDoc(-3600_000)); // expired
     mockFetchBaroData.mockRejectedValue(new Error("API down"));
-    await expect(baroDepartureJob()).rejects.toThrow("API down");
+
+    const result = await baroDepartureJob();
+
+    expect(result.updated).toBe(false);
+    expect(result.notificationSent).toBe(true);
+    expect(mockSendDeparture).toHaveBeenCalled();
+    expect(mockClearAllVotes).toHaveBeenCalled();
+    expect(mockUpsert).not.toHaveBeenCalled();
   });
 
   it("throws when fetchCurrent fails", async () => {
