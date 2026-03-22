@@ -16,7 +16,40 @@ import { sendBaroDepartureNotification } from "../services/notificationService";
 import { clearAllVotes } from "../services/voteService";
 
 const POLL_MAX_ATTEMPTS = 6;
-const POLL_DELAY_MS = 10_000; // 10 seconds between attempts
+const POLL_DELAY_MS = 30_000; // 30 seconds between attempts
+
+// Baro always arrives on Friday at 13:00 UTC and departs 48 hours later
+const BARO_ARRIVAL_HOUR_UTC = 13;
+const BARO_VISIT_DURATION_HOURS = 48;
+
+/**
+ * Computes fallback next-cycle dates based on the known biweekly Friday schedule.
+ * From a Sunday departure, the immediately upcoming Friday (~5 days away) is too
+ * soon — Baro arrives on the *second* next Friday (~12 days away).
+ * Activation time is Friday 13:00 UTC; expiry is 48 hours later (Sunday 13:00 UTC).
+ */
+function computeFallbackBaroCycle(): { activation: string; expiry: string; location: string } {
+    const now = new Date();
+
+    // Days until the next Friday (never 0 — if today is Friday, advance a full week)
+    const dayOfWeek = now.getUTCDay(); // 0 = Sun … 6 = Sat
+    const daysUntilNextFriday = ((5 - dayOfWeek + 7) % 7) || 7;
+
+    // Skip that immediate Friday and land on the one after it (+7 days)
+    const activation = new Date(now);
+    activation.setUTCDate(now.getUTCDate() + daysUntilNextFriday + 7);
+    activation.setUTCHours(BARO_ARRIVAL_HOUR_UTC, 0, 0, 0);
+
+    const expiry = new Date(activation);
+    expiry.setUTCHours(expiry.getUTCHours() + BARO_VISIT_DURATION_HOURS);
+
+    console.warn(
+        `[Baro Departure] Using schedule-based fallback — ` +
+        `next arrival: ${activation.toISOString()}, expiry: ${expiry.toISOString()}`
+    );
+
+    return { activation: activation.toISOString(), expiry: expiry.toISOString(), location: "" };
+}
 
 /**
  * Polls the Baro API until it returns a new expiry date that is in the future,
@@ -86,8 +119,11 @@ export async function baroDepartureJob() {
         await upsertCurrent(false, newBaroData.activation, newBaroData.expiry, newBaroData.location);
         console.log(`[Baro Departure] DB updated — next arrival: ${newBaroData.activation}`);
     } catch (apiError) {
-        console.error("[Baro Departure] Failed to fetch next cycle data from all APIs — DB not updated:", apiError);
-        return { updated: false, notificationSent: true };
+        console.error("[Baro Departure] Failed to fetch next cycle data from all APIs — using schedule-based fallback:", apiError);
+        const fallback = computeFallbackBaroCycle();
+        await upsertCurrent(false, fallback.activation, fallback.expiry, fallback.location);
+        console.warn(`[Baro Departure] DB updated with fallback cycle — next arrival: ${fallback.activation}`);
+        return { updated: true, notificationSent: true, fallback: true };
     }
 
     return { updated: true, notificationSent: true };
