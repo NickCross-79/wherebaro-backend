@@ -1,7 +1,10 @@
 /**
  * Job to send test notifications (for testing only)
  */
-import { sendPushNotifications } from '../services/notificationService';
+import { Expo, ExpoPushMessage } from 'expo-server-sdk';
+import { getActiveTestPushTokens, deactivatePushToken } from '../services/pushTokenService';
+
+const expo = new Expo();
 
 export async function sendTestNotification() {
   const now = new Date();
@@ -11,9 +14,38 @@ export async function sendTestNotification() {
     hour12: true 
   });
 
-  await sendPushNotifications(
-    'Test Notification',
-    `This is a test notification sent at ${timeString}`,
-    { type: 'test', timestamp: now.toISOString() }
-  );
+  const tokens = await getActiveTestPushTokens();
+  console.log(`[Test Notification] Sending to ${tokens.length} test device(s)`);
+
+  if (tokens.length === 0) {
+    console.warn('[Test Notification] No active test push tokens found — skipping send');
+    return;
+  }
+
+  const messages: ExpoPushMessage[] = [];
+  for (const token of tokens) {
+    if (!Expo.isExpoPushToken(token)) {
+      console.error(`[Test Notification] Invalid token: ${token}`);
+      await deactivatePushToken(token);
+      continue;
+    }
+    messages.push({
+      to: token,
+      sound: 'default',
+      title: 'Baro Kiteer',
+      body: `Baro Kiteer will arrive this Friday!`,
+      data: { type: 'test', timestamp: now.toISOString() },
+      priority: 'high',
+      channelId: 'baro-alerts',
+    });
+  }
+
+  const chunks = expo.chunkPushNotifications(messages);
+  for (const chunk of chunks) {
+    try {
+      await expo.sendPushNotificationsAsync(chunk);
+    } catch (error) {
+      console.error('[Test Notification] Error sending chunk:', error);
+    }
+  }
 }
