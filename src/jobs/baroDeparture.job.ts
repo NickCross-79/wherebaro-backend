@@ -120,10 +120,8 @@ export async function baroDepartureJob() {
         console.log(`[Baro Departure] DB updated — next arrival: ${newBaroData.activation}`);
     } catch (apiError) {
         console.error("[Baro Departure] Failed to fetch next cycle data from all APIs — using schedule-based fallback:", apiError);
-        const fallback = computeFallbackBaroCycle();
-        await upsertCurrent(false, fallback.activation, fallback.expiry, fallback.location);
-        console.warn(`[Baro Departure] DB updated with fallback cycle — next arrival: ${fallback.activation}`);
-        return { updated: true, notificationSent: true, fallback: true };
+        computeFallbackBaroCycle(); // log estimated next cycle but do not persist uncertain data
+        return { updated: false, notificationSent: true, fallback: true };
     }
 
     return { updated: true, notificationSent: true };
