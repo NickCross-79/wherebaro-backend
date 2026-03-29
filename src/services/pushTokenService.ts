@@ -65,6 +65,15 @@ export async function registerPushToken(data: CreatePushTokenDto): Promise<PushT
 }
 
 /**
+ * Get all active tokens from the testPushTokens collection.
+ */
+export async function getActiveTestPushTokens(): Promise<string[]> {
+  await connectToDatabase();
+  const tokens = await collections.testPushTokens?.find({ isActive: true }).toArray();
+  return tokens?.map(t => t.token) || [];
+}
+
+/**
  * Get all active push tokens, optionally filtered by notification type preference.
  * Tokens without an explicit preference (legacy) default to receiving all types.
  * @param type - 'arrival' | 'departure' — filter by that preference; omit for all active tokens

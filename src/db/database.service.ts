@@ -11,6 +11,7 @@ export const collections: {
   reviews?: mongoDB.Collection; 
   likes?: mongoDB.Collection;
   pushTokens?: mongoDB.Collection;
+  testPushTokens?: mongoDB.Collection;
   unknownItems?: mongoDB.Collection;
   tempModImages?: mongoDB.Collection;
   votes?: mongoDB.Collection;
@@ -49,6 +50,7 @@ export async function connectToDatabase () {
     const reviewsCollection: mongoDB.Collection = db.collection("reviews");
     const likesCollection: mongoDB.Collection = db.collection("likes");
     const pushTokensCollection: mongoDB.Collection = db.collection("pushTokens");
+    const testPushTokensCollection: mongoDB.Collection = db.collection("testPushTokens");
     const unknownItemsCollection: mongoDB.Collection = db.collection("unknownItems");
     const tempModImagesCollection: mongoDB.Collection = db.collection("tempModImages");
     const votesCollection: mongoDB.Collection = db.collection("votes");
@@ -58,6 +60,7 @@ export async function connectToDatabase () {
     collections.reviews = reviewsCollection;
     collections.likes = likesCollection;
     collections.pushTokens = pushTokensCollection;
+    collections.testPushTokens = testPushTokensCollection;
     collections.unknownItems = unknownItemsCollection;
     collections.tempModImages = tempModImagesCollection;
     collections.votes = votesCollection;
@@ -66,11 +69,13 @@ export async function connectToDatabase () {
     await likesCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
     await pushTokensCollection.createIndex({ token: 1 }, { unique: true });
     await pushTokensCollection.createIndex({ isActive: 1 });
+    await testPushTokensCollection.createIndex({ token: 1 }, { unique: true });
+    await testPushTokensCollection.createIndex({ isActive: 1 });
 
     await unknownItemsCollection.createIndex({ uniqueName: 1 }, { unique: true });
     await tempModImagesCollection.createIndex({ itemId: 1 }, { unique: true });
     await votesCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
 
     isConnected = true;
-    console.log(`[DB] Connected to database: ${db.databaseName} (collections: items, current, reviews, likes, pushTokens, unknownItems, tempModImages, votes)`);
+    console.log(`[DB] Connected to database: ${db.databaseName} (collections: items, current, reviews, likes, pushTokens, testPushTokens, unknownItems, tempModImages, votes)`);
 }
