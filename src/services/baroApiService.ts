@@ -38,7 +38,12 @@ export interface BaroApiResponse {
  * Fetches Baro data from the primary Warframestat API.
  */
 async function fetchFromWarframestat(): Promise<BaroApiResponse> {
-    const response = await fetch(BARO_API_URL);
+    const response = await fetch(BARO_API_URL, {
+        headers: {
+            "Accept": "application/json",
+            "User-Agent": "WhenBaro/1.1",
+        },
+    });
     if (!response.ok) {
         throw new Error(`Warframestat API error: ${response.status} ${response.statusText}`);
     }
