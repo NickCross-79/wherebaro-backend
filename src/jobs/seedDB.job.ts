@@ -1,6 +1,6 @@
 import { scrapeAndPrepareBaroItems } from "../services/wikiIngestService";
 import { insertBaroItems } from "../services/seedDBService";
-import { backfillUniqueNames } from "../services/itemService";
+import { backfillItemData } from "../services/itemService";
 
 export async function seedDB() {
     console.log("Starting DB seeding process...");
@@ -8,8 +8,8 @@ export async function seedDB() {
     const baroItems = await scrapeAndPrepareBaroItems();
     await insertBaroItems(baroItems);
 
-    console.log("Seeding complete, backfilling unique names...");
-    const backfillResult = await backfillUniqueNames();
+    console.log("Seeding complete, backfilling item data...");
+    const backfillResult = await backfillItemData();
 
     console.log("Database seeding complete!");
     return backfillResult;

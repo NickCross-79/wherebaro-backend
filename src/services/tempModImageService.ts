@@ -58,7 +58,7 @@ export async function storeTempModImage(itemId: ObjectId, base64Image: string): 
 export async function resolveModImageSentinels(items: any[]): Promise<any[]> {
     await connectToDatabase();
 
-    const sentinelItems = items.filter((item) => item.image === MOD_IMAGE_SENTINEL);
+    const sentinelItems = items.filter((item) => item.wikiImageLink === MOD_IMAGE_SENTINEL);
     if (sentinelItems.length === 0 || !collections.tempModImages) {
         console.log("[resolveModImageSentinels] No sentinel items or tempModImages collection unavailable, returning items unchanged");
         return items;
@@ -75,10 +75,10 @@ export async function resolveModImageSentinels(items: any[]): Promise<any[]> {
     }
 
     return items.map((item) => {
-        if (item.image === MOD_IMAGE_SENTINEL) {
+        if (item.wikiImageLink === MOD_IMAGE_SENTINEL) {
             const imageData = tempImageMap.get(item._id.toString());
             if (imageData) {
-                return { ...item, image: `data:image/png;base64,${imageData}` };
+                return { ...item, wikiImageLink: `data:image/png;base64,${imageData}` };
             }
         }
         return item;

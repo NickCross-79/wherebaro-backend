@@ -26,6 +26,7 @@ export function mapRawItemToBaroItem(rawData: any): Item {
     return new Item(
         rawData.Name,
         rawData.Image,
+        "",
         rawData.Link,
         rawData.CreditCost,
         rawData.DucatCost,

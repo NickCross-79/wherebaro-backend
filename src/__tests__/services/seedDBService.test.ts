@@ -29,8 +29,8 @@ describe("seedDBService", () => {
       };
 
       const items = [
-        new Item("Primed Flow", "img.png", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
-        new Item("Prisma Grinlok", "grin.png", "/grin", 50000, 500, "Weapon", ["2024-02-20"], [], []),
+        new Item("Primed Flow", "img.png", "", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
+        new Item("Prisma Grinlok", "grin.png", "", "/grin", 50000, 500, "Weapon", ["2024-02-20"], [], []),
       ];
 
       const result = await insertBaroItems(items);

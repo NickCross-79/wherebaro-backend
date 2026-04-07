@@ -30,7 +30,7 @@ function makeItem(overrides: Record<string, any> = {}) {
     return {
         _id: new ObjectId(),
         name: "Test Mod",
-        image: "normal-image.png",
+        wikiImageLink: "normal-image.png",
         ...overrides,
     };
 }
@@ -96,7 +96,7 @@ describe("tempModImageService", () => {
     describe("resolveModImageSentinels", () => {
         it("returns items unchanged when none have the sentinel", async () => {
             mockTempModImagesCollection();
-            const items = [makeItem(), makeItem({ image: "other.png" })];
+            const items = [makeItem(), makeItem({ wikiImageLink: "other.png" })];
 
             const result = await resolveModImageSentinels(items);
 
@@ -115,12 +115,12 @@ describe("tempModImageService", () => {
         it("returns items unchanged when tempModImages collection is not initialized", async () => {
             // collection deliberately not set
             const id = new ObjectId();
-            const items = [makeItem({ _id: id, image: MOD_IMAGE_SENTINEL })];
+            const items = [makeItem({ _id: id, wikiImageLink: MOD_IMAGE_SENTINEL })];
 
             const result = await resolveModImageSentinels(items);
 
             // sentinel item is returned as-is since collection is absent
-            expect(result[0].image).toBe(MOD_IMAGE_SENTINEL);
+            expect(result[0].wikiImageLink).toBe(MOD_IMAGE_SENTINEL);
         });
 
         it("replaces sentinel with data URI for items that have a temp image", async () => {
@@ -133,10 +133,10 @@ describe("tempModImageService", () => {
                 }),
             });
 
-            const items = [makeItem({ _id: id, image: MOD_IMAGE_SENTINEL })];
+            const items = [makeItem({ _id: id, wikiImageLink: MOD_IMAGE_SENTINEL })];
             const result = await resolveModImageSentinels(items);
 
-            expect(result[0].image).toBe(`data:image/png;base64,${base64}`);
+            expect(result[0].wikiImageLink).toBe(`data:image/png;base64,${base64}`);
         });
 
         it("leaves sentinel unchanged when no temp doc exists for that item", async () => {
@@ -149,16 +149,16 @@ describe("tempModImageService", () => {
                 }),
             });
 
-            const items = [makeItem({ _id: id, image: MOD_IMAGE_SENTINEL })];
+            const items = [makeItem({ _id: id, wikiImageLink: MOD_IMAGE_SENTINEL })];
             const result = await resolveModImageSentinels(items);
 
-            expect(result[0].image).toBe(MOD_IMAGE_SENTINEL);
+            expect(result[0].wikiImageLink).toBe(MOD_IMAGE_SENTINEL);
         });
 
         it("handles a mix of sentinel and non-sentinel items correctly", async () => {
             const sentinelId = new ObjectId();
             const base64 = "abc123==";
-            const normalItem = makeItem({ image: "real-image.png" });
+            const normalItem = makeItem({ wikiImageLink: "real-image.png" });
 
             mockTempModImagesCollection({
                 find: jest.fn().mockReturnValue({
@@ -169,14 +169,14 @@ describe("tempModImageService", () => {
             });
 
             const items = [
-                makeItem({ _id: sentinelId, image: MOD_IMAGE_SENTINEL }),
+                makeItem({ _id: sentinelId, wikiImageLink: MOD_IMAGE_SENTINEL }),
                 normalItem,
             ];
 
             const result = await resolveModImageSentinels(items);
 
-            expect(result[0].image).toBe(`data:image/png;base64,${base64}`);
-            expect(result[1].image).toBe("real-image.png");
+            expect(result[0].wikiImageLink).toBe(`data:image/png;base64,${base64}`);
+            expect(result[1].wikiImageLink).toBe("real-image.png");
         });
 
         it("performs a single batch query for multiple sentinel items", async () => {
@@ -193,16 +193,16 @@ describe("tempModImageService", () => {
             });
 
             const items = [
-                makeItem({ _id: id1, image: MOD_IMAGE_SENTINEL }),
-                makeItem({ _id: id2, image: MOD_IMAGE_SENTINEL }),
+                makeItem({ _id: id1, wikiImageLink: MOD_IMAGE_SENTINEL }),
+                makeItem({ _id: id2, wikiImageLink: MOD_IMAGE_SENTINEL }),
             ];
 
             const result = await resolveModImageSentinels(items);
 
             // Only one DB call regardless of how many sentinel items there are
             expect(col.find).toHaveBeenCalledTimes(1);
-            expect(result[0].image).toBe("data:image/png;base64,img1");
-            expect(result[1].image).toBe("data:image/png;base64,img2");
+            expect(result[0].wikiImageLink).toBe("data:image/png;base64,img1");
+            expect(result[1].wikiImageLink).toBe("data:image/png;base64,img2");
         });
 
         it("does not mutate the original item objects", async () => {
@@ -215,13 +215,13 @@ describe("tempModImageService", () => {
                 }),
             });
 
-            const original = makeItem({ _id: id, image: MOD_IMAGE_SENTINEL });
+            const original = makeItem({ _id: id, wikiImageLink: MOD_IMAGE_SENTINEL });
             const items = [original];
 
             await resolveModImageSentinels(items);
 
             // Original object should be untouched (spread creates a new object)
-            expect(original.image).toBe(MOD_IMAGE_SENTINEL);
+            expect(original.wikiImageLink).toBe(MOD_IMAGE_SENTINEL);
         });
     });
 });

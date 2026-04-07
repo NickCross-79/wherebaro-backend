@@ -77,13 +77,13 @@ async function resolveOrInsertItem(
         // image field is set to a sentinel so fetchCurrent can substitute the
         // generated image until the wiki sync job replaces it with the official one.
         const isNewMod = isNewItem && wfcdItem.category?.toLowerCase().includes("mod");
-        const imageUrl = isNewMod
-            ? MOD_IMAGE_SENTINEL
-            : (wfcdItem.imageName ? `${WF_CDN_BASE}/${wfcdItem.imageName}` : "");
+        const wikiImageLink = isNewMod ? MOD_IMAGE_SENTINEL : "";
+        const cdnImageLink = wfcdItem.imageName ? `${WF_CDN_BASE}/${wfcdItem.imageName}` : "";
 
         const newItem = new Item(
             wfcdItem.name,
-            imageUrl,
+            wikiImageLink,
+            cdnImageLink,
             "",
             entry.credits ?? 0,
             entry.ducats ?? 0,
@@ -296,13 +296,13 @@ export async function resolveBaroInventory(inventory: BaroApiInventoryItem[]): P
     return { inventoryIds, unmatchedItems, ignoredItems };
 }
 
-// ─── Backfill Unique Names ───────────────────────────────────────────────────
+// ─── Backfill Item Data ──────────────────────────────────────────────────────
 
 /**
- * Backfills the uniqueName field on all items in the DB that don't have one.
- * Uses the @wfcd/items library to match items by name and write the full uniqueName.
+ * Backfills missing `uniqueName` and `cdnImageLink` fields on all items in the DB.
+ * Uses the @wfcd/items library to match items by name.
  */
-export async function backfillUniqueNames(): Promise<{
+export async function backfillItemData(): Promise<{
     total: number;
     matched: number;
     unmatched: number;
@@ -317,12 +317,21 @@ export async function backfillUniqueNames(): Promise<{
     const { wfcdByExactName, wfcdByNormalized, allWfcdItems } = buildWfcdNameMaps();
     console.log(`[Backfill] Loaded ${wfcdByExactName.size} items from @wfcd/items library`);
 
-    // Find all DB items missing a uniqueName
+    // Find all DB items missing a uniqueName or cdnImageLink
     const itemsToUpdate = await collections.items
-        .find({ $or: [{ uniqueName: { $exists: false } }, { uniqueName: null }, { uniqueName: "" }] })
+        .find({
+            $or: [
+                { uniqueName: { $exists: false } },
+                { uniqueName: null },
+                { uniqueName: "" },
+                { cdnImageLink: { $exists: false } },
+                { cdnImageLink: null },
+                { cdnImageLink: "" },
+            ],
+        })
         .toArray();
 
-    console.log(`[Backfill] Found ${itemsToUpdate.length} items without uniqueName`);
+    console.log(`[Backfill] Found ${itemsToUpdate.length} items needing backfill`);
 
     let matched = 0;
     let unmatched = 0;
@@ -338,10 +347,16 @@ export async function backfillUniqueNames(): Promise<{
         const wfcdMatch = findWfcdMatch(itemName, wfcdByExactName, wfcdByNormalized, allWfcdItems);
 
         if (wfcdMatch) {
-            await collections.items.updateOne(
-                { _id: dbItem._id },
-                { $set: { uniqueName: wfcdMatch.uniqueName } }
-            );
+            const update: Record<string, any> = {};
+            if (!(dbItem as any).uniqueName) {
+                update.uniqueName = wfcdMatch.uniqueName;
+            }
+            if (!(dbItem as any).cdnImageLink) {
+                update.cdnImageLink = wfcdMatch.imageName ? `${WF_CDN_BASE}/${wfcdMatch.imageName}` : "";
+            }
+            if (Object.keys(update).length > 0) {
+                await collections.items.updateOne({ _id: dbItem._id }, { $set: update });
+            }
             matched++;
         } else {
             unmatched++;
