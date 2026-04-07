@@ -18,6 +18,7 @@ export async function baroArrival(myTimer: Timer, context: InvocationContext): P
     }
 }
 
+// Schedule the timer to run every Friday at 9:00 AM EDT (13:00 UTC)
 app.timer("baroArrival", {
     schedule: "0 0 13 * * Fri",
     handler: baroArrival,
