@@ -16,8 +16,8 @@ import { upsertCurrent } from "../services/currentService";
 import { sendBaroArrivalNotification, sendWishlistMatchNotification } from "../services/notificationService";
 import { getWishlistMatchesForCurrentInventory } from "../services/wishlistService";
 
-const INVENTORY_RETRY_ATTEMPTS = 5;
-const INVENTORY_RETRY_DELAY_MS = 5_000; // 5 seconds between retries
+const INVENTORY_RETRY_ATTEMPTS = 30;
+const INVENTORY_RETRY_DELAY_MS = 10_000; // 10 seconds between retries
 
 /**
  * Attempts to fetch Baro data with a non-empty inventory.
