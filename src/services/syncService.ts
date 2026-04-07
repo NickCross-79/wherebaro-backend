@@ -2,7 +2,7 @@ import { collections, connectToDatabase } from "../db/database.service";
 import Item from "../models/Item";
 
 /** Fields that should be updated from wiki data */
-const SYNC_FIELDS = ["name", "image", "link", "creditPrice", "ducatPrice", "type", "offeringDates"] as const;
+const SYNC_FIELDS = ["name", "wikiImageLink", "link", "creditPrice", "ducatPrice", "type", "offeringDates"] as const;
 
 export interface SyncResult {
     totalWikiItems: number;
@@ -18,7 +18,7 @@ export interface SyncResult {
  * Returns null if nothing changed.
  */
 export function getChangedFields(
-    wikiItem: { name: string; image: string; link: string; creditPrice: number; ducatPrice: number; type: string; offeringDates: string[] },
+    wikiItem: { name: string; wikiImageLink: string; link: string; creditPrice: number; ducatPrice: number; type: string; offeringDates: string[] },
     dbItem: Record<string, any>
 ): Record<string, any> | null {
     const updates: Record<string, any> = {};
@@ -71,7 +71,8 @@ export async function syncItems(wikiItems: Item[]): Promise<SyncResult> {
             // Insert new item that doesn't exist in DB yet
             await collections.items.insertOne({
                 name: wikiItem.name,
-                image: wikiItem.image,
+                wikiImageLink: wikiItem.wikiImageLink,
+                cdnImageLink: "",
                 link: wikiItem.link,
                 creditPrice: wikiItem.creditPrice,
                 ducatPrice: wikiItem.ducatPrice,

@@ -154,7 +154,7 @@ describe("baroArrival.job", () => {
     expect(result.isActive).toBe(true);
     expect(result.notificationSent).toBe(true);
     expect(result.inventoryCount).toBe(0);
-    expect(mockFetchBaroData).toHaveBeenCalledTimes(6); // 5 retry attempts + 1 final call
+    expect(mockFetchBaroData).toHaveBeenCalledTimes(31); // 30 retry attempts + 1 final call
     expect(mockResolve).not.toHaveBeenCalled();
     expect(mockSendArrival).toHaveBeenCalled();
   });

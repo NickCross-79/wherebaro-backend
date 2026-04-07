@@ -12,6 +12,7 @@ describe("Models", () => {
       const item = new Item(
         "Primed Flow",
         "https://img.com/flow.png",
+        "",
         "https://wiki.warframe.com/Primed_Flow",
         175000,
         300,
@@ -22,7 +23,7 @@ describe("Models", () => {
       );
 
       expect(item.name).toBe("Primed Flow");
-      expect(item.image).toBe("https://img.com/flow.png");
+      expect(item.wikiImageLink).toBe("https://img.com/flow.png");
       expect(item.link).toBe("https://wiki.warframe.com/Primed_Flow");
       expect(item.creditPrice).toBe(175000);
       expect(item.ducatPrice).toBe(300);
@@ -33,17 +34,17 @@ describe("Models", () => {
     });
 
     it("supports optional uniqueName", () => {
-      const item = new Item("Test", "", "", 0, 0, "Misc", [], [], [], "/Lotus/Test");
+      const item = new Item("Test", "", "", "", 0, 0, "Misc", [], [], [], "/Lotus/Test");
       expect(item.uniqueName).toBe("/Lotus/Test");
     });
 
     it("supports optional wishlistPushTokens", () => {
-      const item = new Item("Test", "", "", 0, 0, "Misc", [], [], [], undefined, ["token-1"]);
+      const item = new Item("Test", "", "", "", 0, 0, "Misc", [], [], [], undefined, ["token-1"]);
       expect(item.wishlistPushTokens).toEqual(["token-1"]);
     });
 
     it("defaults optional fields to undefined", () => {
-      const item = new Item("Test", "", "", 0, 0, "Misc", [], [], []);
+      const item = new Item("Test", "", "", "", 0, 0, "Misc", [], [], []);
       expect(item.uniqueName).toBeUndefined();
       expect(item.wishlistPushTokens).toBeUndefined();
     });

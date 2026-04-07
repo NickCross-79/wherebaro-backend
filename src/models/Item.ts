@@ -1,7 +1,8 @@
 export default class Item {
     constructor(
         public name: string,
-        public image: string,
+        public wikiImageLink: string,
+        public cdnImageLink: string,
         public link: string,
         public creditPrice: number, 
         public ducatPrice: number,

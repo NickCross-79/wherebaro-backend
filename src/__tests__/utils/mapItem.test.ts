@@ -24,7 +24,8 @@ describe("mapItem", () => {
 
       expect(item).toBeInstanceOf(Item);
       expect(item.name).toBe("Primed Flow");
-      expect(item.image).toBe("https://example.com/img.png");
+      expect(item.wikiImageLink).toBe("https://example.com/img.png");
+      expect(item.cdnImageLink).toBe("");
       expect(item.link).toBe("https://wiki.warframe.com/Primed_Flow");
       expect(item.creditPrice).toBe(175000);
       expect(item.ducatPrice).toBe(300);

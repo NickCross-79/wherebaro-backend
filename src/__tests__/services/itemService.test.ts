@@ -304,7 +304,7 @@ describe("itemService", () => {
         await resolveBaroInventory([modEntry()]);
 
         const insertedDoc = col.insertOne.mock.calls[0][0];
-        expect(insertedDoc.image).toBe("temp:modImage");
+        expect(insertedDoc.wikiImageLink).toBe("temp:modImage");
       });
 
       it("calls generate with the wfcd item data when a new mod is inserted", async () => {

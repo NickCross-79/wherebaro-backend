@@ -30,7 +30,7 @@ describe("syncService", () => {
         it("returns null when nothing changed", () => {
             const wiki = {
                 name: "Primed Flow",
-                image: "img.png",
+                wikiImageLink: "img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -44,7 +44,7 @@ describe("syncService", () => {
         it("detects changed scalar fields", () => {
             const wiki = {
                 name: "Primed Flow",
-                image: "new-img.png",
+                wikiImageLink: "new-img.png",
                 link: "/link",
                 creditPrice: 200000,
                 ducatPrice: 300,
@@ -53,7 +53,7 @@ describe("syncService", () => {
             };
             const db = {
                 name: "Primed Flow",
-                image: "old-img.png",
+                wikiImageLink: "old-img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -62,7 +62,7 @@ describe("syncService", () => {
             };
             const result = getChangedFields(wiki, db);
             expect(result).toEqual({
-                image: "new-img.png",
+                wikiImageLink: "new-img.png",
                 creditPrice: 200000,
             });
         });
@@ -70,7 +70,7 @@ describe("syncService", () => {
         it("detects changed offeringDates regardless of order", () => {
             const wiki = {
                 name: "Primed Flow",
-                image: "img.png",
+                wikiImageLink: "img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -79,7 +79,7 @@ describe("syncService", () => {
             };
             const db = {
                 name: "Primed Flow",
-                image: "img.png",
+                wikiImageLink: "img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -95,7 +95,7 @@ describe("syncService", () => {
         it("treats same offeringDates in different order as unchanged", () => {
             const wiki = {
                 name: "Primed Flow",
-                image: "img.png",
+                wikiImageLink: "img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -104,7 +104,7 @@ describe("syncService", () => {
             };
             const db = {
                 name: "Primed Flow",
-                image: "img.png",
+                wikiImageLink: "img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -117,7 +117,7 @@ describe("syncService", () => {
         it("does not include preserved fields even if they differ", () => {
             const wiki = {
                 name: "Primed Flow",
-                image: "img.png",
+                wikiImageLink: "img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -141,7 +141,7 @@ describe("syncService", () => {
 
     describe("syncItems", () => {
         it("throws when items collection is not initialized", async () => {
-            const items = [new Item("Test", "img.png", "/link", 100, 200, "Mod", [], [], [])];
+            const items = [new Item("Test", "img.png", "", "/link", 100, 200, "Mod", [], [], [])];
             await expect(syncItems(items)).rejects.toThrow("Items collection not initialized");
         });
 
@@ -150,7 +150,7 @@ describe("syncService", () => {
             const mockFindOne = jest.fn().mockResolvedValue({
                 _id: dbItemId,
                 name: "Primed Flow",
-                image: "old-img.png",
+                wikiImageLink: "old-img.png",
                 link: "/link",
                 creditPrice: 175000,
                 ducatPrice: 300,
@@ -172,7 +172,7 @@ describe("syncService", () => {
             };
 
             const wikiItems = [
-                new Item("Primed Flow", "new-img.png", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
+                new Item("Primed Flow", "new-img.png", "", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
             ];
 
             const result = await syncItems(wikiItems);
@@ -181,13 +181,13 @@ describe("syncService", () => {
             expect(result.updatedItems).toBe(1);
             expect(result.newItems).toBe(0);
             expect(result.changes).toEqual([
-                { name: "Primed Flow", fieldsUpdated: ["image"] },
+                { name: "Primed Flow", fieldsUpdated: ["wikiImageLink"] },
             ]);
 
             // Should only update the changed field, not preserved ones
             expect(mockUpdateOne).toHaveBeenCalledWith(
                 { _id: dbItemId },
-                { $set: { image: "new-img.png" } }
+                { $set: { wikiImageLink: "new-img.png" } }
             );
             expect(mockInsertOne).not.toHaveBeenCalled();
         });
@@ -197,7 +197,7 @@ describe("syncService", () => {
                 findOne: jest.fn().mockResolvedValue({
                     _id: new ObjectId(),
                     name: "Primed Flow",
-                    image: "img.png",
+                    wikiImageLink: "img.png",
                     link: "/link",
                     creditPrice: 175000,
                     ducatPrice: 300,
@@ -209,7 +209,7 @@ describe("syncService", () => {
             };
 
             const wikiItems = [
-                new Item("Primed Flow", "img.png", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
+                new Item("Primed Flow", "img.png", "", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
             ];
 
             const result = await syncItems(wikiItems);
@@ -230,7 +230,7 @@ describe("syncService", () => {
             };
 
             const wikiItems = [
-                new Item("New Item", "img.png", "/link", 100000, 200, "Weapon", ["2024-05-01"], [], []),
+                new Item("New Item", "img.png", "", "/link", 100000, 200, "Weapon", ["2024-05-01"], [], []),
             ];
 
             const result = await syncItems(wikiItems);
@@ -240,7 +240,7 @@ describe("syncService", () => {
             expect(mockInsertOne).toHaveBeenCalledWith(
                 expect.objectContaining({
                     name: "New Item",
-                    image: "img.png",
+                    wikiImageLink: "img.png",
                     link: "/link",
                     creditPrice: 100000,
                     ducatPrice: 200,
@@ -260,7 +260,7 @@ describe("syncService", () => {
                 .mockResolvedValueOnce({
                     _id: existingId,
                     name: "Primed Flow",
-                    image: "img.png",
+                    wikiImageLink: "img.png",
                     link: "/link",
                     creditPrice: 175000,
                     ducatPrice: 300,
@@ -276,8 +276,8 @@ describe("syncService", () => {
             };
 
             const wikiItems = [
-                new Item("Primed Flow", "img.png", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
-                new Item("New Weapon", "weapon.png", "/weapon", 50000, 500, "Weapon", ["2024-06-01"], [], []),
+                new Item("Primed Flow", "img.png", "", "/link", 175000, 300, "Mod", ["2024-01-10"], [], []),
+                new Item("New Weapon", "weapon.png", "", "/weapon", 50000, 500, "Weapon", ["2024-06-01"], [], []),
             ];
 
             const result = await syncItems(wikiItems);
