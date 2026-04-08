@@ -15,6 +15,7 @@ export const collections: {
   unknownItems?: mongoDB.Collection;
   tempModImages?: mongoDB.Collection;
   votes?: mongoDB.Collection;
+  psa?: mongoDB.Collection;
 } = {}
 
 export let db: mongoDB.Db;
@@ -54,6 +55,7 @@ export async function connectToDatabase () {
     const unknownItemsCollection: mongoDB.Collection = db.collection("unknownItems");
     const tempModImagesCollection: mongoDB.Collection = db.collection("tempModImages");
     const votesCollection: mongoDB.Collection = db.collection("votes");
+    const psaCollection: mongoDB.Collection = db.collection("psa");
 
     collections.items = itemsCollection;
     collections.current = currentCollection;
@@ -64,6 +66,7 @@ export async function connectToDatabase () {
     collections.unknownItems = unknownItemsCollection;
     collections.tempModImages = tempModImagesCollection;
     collections.votes = votesCollection;
+    collections.psa = psaCollection;
 
     await reviewsCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
     await likesCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
@@ -77,5 +80,5 @@ export async function connectToDatabase () {
     await votesCollection.createIndex({ item_oid: 1, uid: 1 }, { unique: true });
 
     isConnected = true;
-    console.log(`[DB] Connected to database: ${db.databaseName} (collections: items, current, reviews, likes, pushTokens, testPushTokens, unknownItems, tempModImages, votes)`);
+    console.log(`[DB] Connected to database: ${db.databaseName} (collections: items, current, reviews, likes, pushTokens, testPushTokens, unknownItems, tempModImages, votes, psa)`);
 }
