@@ -14,8 +14,6 @@ import {
 import { storeTempModImage, MOD_IMAGE_SENTINEL } from "./tempModImageService";
 import { generateModImage } from "./modGeneratorLoader";
 
-const WF_CDN_BASE = "https://cdn.warframestat.us/img";
-
 // ─── DB Lookup ───────────────────────────────────────────────────────────────
 
 /**
@@ -78,7 +76,7 @@ async function resolveOrInsertItem(
         // generated image until the wiki sync job replaces it with the official one.
         const isNewMod = isNewItem && wfcdItem.category?.toLowerCase().includes("mod");
         const wikiImageLink = isNewMod ? MOD_IMAGE_SENTINEL : "";
-        const cdnImageLink = wfcdItem.imageName ? `${WF_CDN_BASE}/${wfcdItem.imageName}` : "";
+        const cdnImageLink = wfcdItem.imageName ?? "";
 
         const newItem = new Item(
             wfcdItem.name,
@@ -317,21 +315,10 @@ export async function backfillItemData(): Promise<{
     const { wfcdByExactName, wfcdByNormalized, allWfcdItems } = buildWfcdNameMaps();
     console.log(`[Backfill] Loaded ${wfcdByExactName.size} items from @wfcd/items library`);
 
-    // Find all DB items missing a uniqueName or cdnImageLink
-    const itemsToUpdate = await collections.items
-        .find({
-            $or: [
-                { uniqueName: { $exists: false } },
-                { uniqueName: null },
-                { uniqueName: "" },
-                { cdnImageLink: { $exists: false } },
-                { cdnImageLink: null },
-                { cdnImageLink: "" },
-            ],
-        })
-        .toArray();
+    // Fetch all items — cdnImageLink is always refreshed; uniqueName is only filled when missing
+    const itemsToUpdate = await collections.items.find({}).toArray();
 
-    console.log(`[Backfill] Found ${itemsToUpdate.length} items needing backfill`);
+    console.log(`[Backfill] Found ${itemsToUpdate.length} items to process`);
 
     let matched = 0;
     let unmatched = 0;
@@ -351,9 +338,7 @@ export async function backfillItemData(): Promise<{
             if (!(dbItem as any).uniqueName) {
                 update.uniqueName = wfcdMatch.uniqueName;
             }
-            if (!(dbItem as any).cdnImageLink) {
-                update.cdnImageLink = wfcdMatch.imageName ? `${WF_CDN_BASE}/${wfcdMatch.imageName}` : "";
-            }
+            update.cdnImageLink = wfcdMatch.imageName ?? "";
             if (Object.keys(update).length > 0) {
                 await collections.items.updateOne({ _id: dbItem._id }, { $set: update });
             }
