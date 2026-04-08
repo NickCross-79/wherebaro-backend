@@ -21,5 +21,6 @@ export async function fetchActivePsa(): Promise<PsaDocument[]> {
         title: psa.title,
         message: psa.message,
         createdAt: psa.createdAt,
+        isActive: psa.isActive,
     }));
 }
