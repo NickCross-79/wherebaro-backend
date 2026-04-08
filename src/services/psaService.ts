@@ -5,6 +5,7 @@ export interface PsaDocument {
     title: string;
     message: string;
     createdAt: string;
+    isActive: boolean;
 }
 
 export async function fetchActivePsa(): Promise<PsaDocument[]> {
@@ -14,7 +15,7 @@ export async function fetchActivePsa(): Promise<PsaDocument[]> {
         throw new Error("PSA collection not initialized");
     }
 
-    const psas = await collections.psa.find({}).toArray();
+    const psas = await collections.psa.find({ isActive: true }).toArray();
     return psas.map((psa) => ({
         _id: psa._id.toString(),
         title: psa.title,
