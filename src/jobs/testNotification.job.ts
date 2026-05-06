@@ -1,7 +1,7 @@
 /**
  * Job to send test notifications (for testing only)
  */
-import { sendPushNotifications } from '../services/notificationService';
+import { sendTestPushNotifications } from '../services/notificationService';
 
 export async function sendTestNotification() {
   const now = new Date();
@@ -11,7 +11,7 @@ export async function sendTestNotification() {
     hour12: true,
   });
 
-  await sendPushNotifications(
+  await sendTestPushNotifications(
     'Test Notification',
     `This is a test notification sent at ${timeString}`,
     { type: 'test' },
