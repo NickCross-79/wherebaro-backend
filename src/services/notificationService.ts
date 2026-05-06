@@ -2,7 +2,7 @@
  * Service for sending push notifications using Expo
  */
 import { Expo, ExpoPushMessage, ExpoPushTicket, ExpoPushErrorReceipt } from 'expo-server-sdk';
-import { getActivePushTokens, deactivatePushToken } from './pushTokenService';
+import { getActivePushTokens, getActiveTestPushTokens, deactivatePushToken } from './pushTokenService';
 
 const expo = new Expo();
 
@@ -26,9 +26,30 @@ export async function sendPushNotifications(
   data?: Record<string, any>,
   type?: 'arrival' | 'departure'
 ): Promise<{ success: number; failed: number }> {
+  const pushTokens = await getActivePushTokens(type);
+  return sendToTokens(pushTokens, title, body, data);
+}
+
+/**
+ * Send push notifications to all registered TEST devices only
+ * (devices in the testPushTokens collection).
+ */
+export async function sendTestPushNotifications(
+  title: string,
+  body: string,
+  data?: Record<string, any>
+): Promise<{ success: number; failed: number }> {
+  const pushTokens = await getActiveTestPushTokens();
+  return sendToTokens(pushTokens, title, body, data);
+}
+
+async function sendToTokens(
+  pushTokens: string[],
+  title: string,
+  body: string,
+  data?: Record<string, any>
+): Promise<{ success: number; failed: number }> {
   try {
-    // Get tokens filtered by notification type preference
-    const pushTokens = await getActivePushTokens(type);
     console.log(`[Notifications] Sending "${title}" to ${pushTokens.length} device(s)`);
 
     if (pushTokens.length === 0) {
