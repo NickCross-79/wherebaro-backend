@@ -43,6 +43,7 @@ jest.mock("../../services/pushTokenService", () => ({
 
 jest.mock("../../services/notificationService", () => ({
   sendPushNotifications: jest.fn(),
+  sendTestPushNotifications: jest.fn(),
 }));
 
 // ─── Imports ─────────────────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ import { getReviewsForItem, postReview, updateReview, deleteReview } from "../..
 import { fetchCurrent } from "../../services/currentService";
 import { fetchAllItems } from "../../services/itemService";
 import { registerPushToken, removePushToken } from "../../services/pushTokenService";
-import { sendPushNotifications } from "../../services/notificationService";
+import { sendPushNotifications, sendTestPushNotifications } from "../../services/notificationService";
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -221,7 +222,7 @@ describe("Job wrappers", () => {
   describe("testNotification.job", () => {
     it("sends a test notification with current time", async () => {
       await sendTestNotification();
-      expect(sendPushNotifications).toHaveBeenCalledWith(
+      expect(sendTestPushNotifications).toHaveBeenCalledWith(
         expect.stringContaining("Test"),
         expect.stringContaining("test notification"),
         expect.objectContaining({ type: "test" })
