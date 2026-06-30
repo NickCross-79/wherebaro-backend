@@ -242,6 +242,131 @@ export async function deleteReview(reviewId: ObjectId, uid: string): Promise<boo
     return true;
 }
 
+export interface ReportedReview {
+    _id: string;
+    item_oid: string;
+    itemName: string;
+    user: string;
+    content: string;
+    date: string;
+    time: string;
+    reportCount: number;
+}
+
+/**
+ * Fetches all reviews that have been reported at least once, enriched with the
+ * name of the item they belong to, sorted by most-reported first. Used by the
+ * admin moderation queue.
+ */
+export async function getReportedReviews(): Promise<ReportedReview[]> {
+    await connectToDatabase();
+
+    if (!collections.reviews) {
+        throw new Error("Reviews collection not initialized");
+    }
+    if (!collections.items) {
+        throw new Error("Items collection not initialized");
+    }
+
+    const reviews = await collections.reviews
+        .find({ reportCount: { $gt: 0 } })
+        .sort({ reportCount: -1 })
+        .toArray();
+
+    if (reviews.length === 0) {
+        return [];
+    }
+
+    // Look up the item names in one query.
+    const itemIds = Array.from(
+        new Set(reviews.map((r) => r.item_oid?.toString()).filter(Boolean))
+    ).map((id) => new ObjectId(id));
+
+    const items = await collections.items
+        .find({ _id: { $in: itemIds } })
+        .toArray();
+
+    const nameById = new Map<string, string>();
+    for (const item of items) {
+        nameById.set(item._id.toString(), item.name || "Unknown item");
+    }
+
+    return reviews.map((r) => ({
+        _id: r._id.toString(),
+        item_oid: r.item_oid?.toString() ?? "",
+        itemName: nameById.get(r.item_oid?.toString()) ?? "Unknown item",
+        user: r.user,
+        content: r.content,
+        date: r.date,
+        time: r.time,
+        reportCount: r.reportCount ?? 0,
+    }));
+}
+
+/**
+ * Approves a reported review by clearing its report count, keeping the review
+ * visible. Admin moderation action.
+ * @returns true if the review was found
+ */
+export async function approveReview(reviewId: ObjectId): Promise<boolean> {
+    await connectToDatabase();
+
+    if (!collections.reviews) {
+        throw new Error("Reviews collection not initialized");
+    }
+
+    if (!ObjectId.isValid(reviewId)) {
+        throw new Error("Invalid review ID");
+    }
+
+    const result = await collections.reviews.updateOne(
+        { _id: reviewId },
+        { $set: { reportCount: 0 } }
+    );
+
+    if (result.matchedCount === 0) {
+        return false;
+    }
+
+    console.log(`Review ${reviewId} approved (report count cleared)`);
+    return true;
+}
+
+/**
+ * Deletes a review as an admin (no uid ownership check) and removes it from the
+ * owning item's reviews array. Admin moderation action.
+ * @returns true if the review was found and deleted
+ */
+export async function adminDeleteReview(reviewId: ObjectId): Promise<boolean> {
+    await connectToDatabase();
+
+    if (!collections.reviews) {
+        throw new Error("Reviews collection not initialized");
+    }
+    if (!collections.items) {
+        throw new Error("Items collection not initialized");
+    }
+
+    if (!ObjectId.isValid(reviewId)) {
+        throw new Error("Invalid review ID");
+    }
+
+    const review = await collections.reviews.findOne({ _id: reviewId });
+    if (!review) {
+        return false;
+    }
+
+    await collections.reviews.deleteOne({ _id: reviewId });
+
+    await collections.items.updateOne(
+        { _id: review.item_oid },
+        { $pull: { reviews: reviewId.toString() } } as any
+    );
+
+    console.log(`Admin deleted review ${reviewId} from item ${review.item_oid}`);
+    return true;
+}
+
 /**
  * Increments the reportCount on a review
  * @param reviewId Review ObjectId
