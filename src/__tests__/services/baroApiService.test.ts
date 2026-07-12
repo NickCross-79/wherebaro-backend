@@ -81,6 +81,29 @@ describe("baroApiService", () => {
       expect(result.source).toBe("warframestat");
     });
 
+    it("skips the TennoCon trader and returns the regular Baro (TennoCon weekend)", async () => {
+      const tennocon = baroResponse({ id: "tennocon-baro", location: "TennoConHUB2" });
+      const regular = baroResponse();
+      mockFetch.mockResolvedValueOnce(okResponse([tennocon, regular]));
+
+      const result = await fetchBaroData();
+
+      expect(result.location).toBe("Strata Relay");
+      expect(result.source).toBe("warframestat");
+      expect(mockFetchWorldStateTrader).not.toHaveBeenCalled();
+    });
+
+    it("falls back to world state when only the TennoCon trader is returned", async () => {
+      const tennocon = baroResponse({ id: "tennocon-baro", location: "TennoConHUB2" });
+      mockFetch.mockResolvedValueOnce(okResponse([tennocon]));
+      mockFetchWorldStateTrader.mockResolvedValueOnce(worldStateTrader());
+
+      const result = await fetchBaroData();
+
+      expect(result.source).toBe("worldstate");
+      expect(result.location).toBe("Larunda Relay (Mercury)");
+    });
+
     it("defaults inventory to empty array when missing (Baro not active)", async () => {
       // Baro not active — empty inventory is expected, no fallback triggered
       const data = baroResponse({
