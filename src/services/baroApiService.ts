@@ -35,6 +35,14 @@ export interface BaroApiResponse {
 // ─── Primary API ─────────────────────────────────────────────────────────────
 
 /**
+ * Detects the special TennoCon relay trader that appears in the voidTraders
+ * feed during TennoCon weekend — the app only ever shows the regular Baro.
+ */
+function isTennoConTrader(trader: BaroApiResponse): boolean {
+    return /tennocon/i.test(`${trader.id ?? ""} ${trader.location ?? ""}`);
+}
+
+/**
  * Fetches Baro data from the primary Warframestat API.
  */
 async function fetchFromWarframestat(): Promise<BaroApiResponse> {
@@ -49,9 +57,12 @@ async function fetchFromWarframestat(): Promise<BaroApiResponse> {
     }
 
     const data = await response.json();
-    const baroData: BaroApiResponse | undefined = Array.isArray(data) ? data[0] : data;
+    // During TennoCon the API returns an extra trader at the TennoCon relay
+    // (e.g. "TennoConHUB2"), often first — only the regular Baro counts.
+    const traders: (BaroApiResponse | undefined)[] = Array.isArray(data) ? data : [data];
+    const baroData = traders.find((trader) => trader && !isTennoConTrader(trader));
     if (!baroData) {
-        throw new Error("Invalid Baro data received from Warframestat API");
+        throw new Error("No regular Baro trader found in Warframestat API response");
     }
 
     baroData.inventory ??= [];

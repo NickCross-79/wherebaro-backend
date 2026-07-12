@@ -58,10 +58,14 @@ export async function fetchWorldStateTrader(): Promise<WorldStateTrader> {
     }
 
     const worldState = await response.json();
-    const rawTrader = worldState.VoidTraders?.[0];
+    // During TennoCon an extra trader appears at the TennoCon relay
+    // (e.g. node "TennoConHUB2"), often first in the array — the app
+    // only ever shows the regular relay Baro, so skip TennoCon nodes.
+    const traders: any[] = worldState.VoidTraders ?? [];
+    const rawTrader = traders.find((t: any) => t && !/tennocon/i.test(String(t.Node ?? "")));
 
     if (!rawTrader) {
-        throw new Error("No VoidTrader data found in world state");
+        throw new Error("No regular VoidTrader data found in world state");
     }
 
     return {
