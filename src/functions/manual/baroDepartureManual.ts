@@ -1,11 +1,19 @@
 /**
  * Manual trigger for the Sunday Departure scheduled job.
  * Checks if Baro just left, updates the DB, and sends a departure notification.
+ *
+ * Admin only: requires the API key in the Authorization header. Triggered from
+ * the Whenbaro Admin app. This job pushes a notification to every registered
+ * device and clears all votes, so it must never be reachable without the key.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { baroDepartureJob } from "../../jobs/baroDeparture.job";
+import { requireAdminAuth } from "../../utils/auth";
 
 export async function baroDepartureManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "Baro departure");
+    if (denied) return denied;
+
     context.log(`[Manual] Baro departure job triggered at ${new Date().toISOString()}`);
 
     try {
@@ -27,7 +35,7 @@ export async function baroDepartureManualHttp(request: HttpRequest, context: Inv
 }
 
 app.http("baroDepartureManual", {
-    methods: ["GET", "POST"],
+    methods: ["POST"],
     authLevel: "anonymous",
     handler: baroDepartureManualHttp,
 });
