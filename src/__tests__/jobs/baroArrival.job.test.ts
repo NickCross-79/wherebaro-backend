@@ -11,6 +11,7 @@ jest.mock("../../services/baroApiService", () => ({
     const now = new Date();
     return now >= new Date(activation) && now <= new Date(expiry);
   }),
+  isStaleCycle: jest.fn((expiry: string) => new Date(expiry) <= new Date()),
 }));
 
 jest.mock("../../services/itemService", () => ({
@@ -23,6 +24,7 @@ jest.mock("../../services/itemService", () => ({
 
 jest.mock("../../services/currentService", () => ({
   upsertCurrent: jest.fn().mockResolvedValue(undefined),
+  markArrivalNotified: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../../services/notificationService", () => ({
@@ -36,7 +38,7 @@ jest.mock("../../services/wishlistService", () => ({
 
 import { fetchBaroData } from "../../services/baroApiService";
 import { resolveBaroInventory } from "../../services/itemService";
-import { upsertCurrent } from "../../services/currentService";
+import { upsertCurrent, markArrivalNotified } from "../../services/currentService";
 import {
   sendBaroArrivalNotification,
   sendWishlistMatchNotification,
@@ -46,6 +48,7 @@ import { getWishlistMatchesForCurrentInventory } from "../../services/wishlistSe
 const mockFetchBaroData = fetchBaroData as jest.Mock;
 const mockResolve = resolveBaroInventory as jest.Mock;
 const mockUpsert = upsertCurrent as jest.Mock;
+const mockMarkNotified = markArrivalNotified as jest.Mock;
 const mockSendArrival = sendBaroArrivalNotification as jest.Mock;
 const mockSendWishlist = sendWishlistMatchNotification as jest.Mock;
 const mockGetWishlist = getWishlistMatchesForCurrentInventory as jest.Mock;
@@ -134,6 +137,84 @@ describe("baroArrival.job", () => {
     expect(result.notificationSent).toBe(true);
     expect(mockFetchBaroData).toHaveBeenCalledTimes(2);
     expect(mockResolve).toHaveBeenCalled();
+  });
+
+  it("retries when the API is still serving last visit's cycle, then notifies once it flips", async () => {
+    // The missed-arrival regression. At Baro's activation instant every upstream
+    // source still reports the previous visit, so he reads as absent. This used
+    // to return on the first attempt and skip the arrival entirely — storing
+    // isActive:false and never sending a notification.
+    jest.useFakeTimers({ doNotFake: ["Date"] });
+    const inventory = [{ uniqueName: "/Lotus/Foo", item: "Primed Flow", ducats: 300, credits: 175000 }];
+
+    mockFetchBaroData
+      .mockResolvedValueOnce(
+        baroData({
+          activation: new Date(Date.now() - 14 * 86400_000).toISOString(),
+          expiry: new Date(Date.now() - 12 * 86400_000).toISOString(),
+          inventory: [],
+        })
+      )
+      .mockResolvedValueOnce(
+        baroData({
+          activation: new Date(Date.now() - 60_000).toISOString(),
+          expiry: new Date(Date.now() + 47 * 3600_000).toISOString(),
+          location: "Orcus Relay (Pluto)",
+          inventory,
+        })
+      );
+
+    const resultPromise = baroArrivalJob();
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+    jest.useRealTimers();
+
+    expect(result.isActive).toBe(true);
+    expect(result.notificationSent).toBe(true);
+    expect(result.inventoryCount).toBe(1);
+    expect(mockFetchBaroData).toHaveBeenCalledTimes(2);
+    expect(mockSendArrival).toHaveBeenCalledWith("Orcus Relay (Pluto)");
+    expect(mockMarkNotified).toHaveBeenCalled();
+  });
+
+  it("does NOT retry on an off-week when Baro is genuinely between visits", async () => {
+    // Baro is biweekly, so most Fridays this job legitimately finds nobody home.
+    // The next cycle is already published (expiry in the future), which is the
+    // signal that "absent" is the truth rather than upstream lag.
+    jest.useFakeTimers({ doNotFake: ["Date"] });
+    mockFetchBaroData.mockResolvedValue(
+      baroData({
+        activation: new Date(Date.now() + 5 * 86400_000).toISOString(),
+        expiry: new Date(Date.now() + 7 * 86400_000).toISOString(),
+        inventory: [],
+      })
+    );
+
+    const resultPromise = baroArrivalJob();
+    await jest.runAllTimersAsync();
+    const result = await resultPromise;
+    jest.useRealTimers();
+
+    expect(result.isActive).toBe(false);
+    expect(result.notificationSent).toBe(false);
+    expect(mockFetchBaroData).toHaveBeenCalledTimes(1);
+    expect(mockSendArrival).not.toHaveBeenCalled();
+    expect(mockMarkNotified).not.toHaveBeenCalled();
+  });
+
+  it("records the notified cycle so the reconcile job will not re-notify", async () => {
+    const activation = new Date(Date.now() - 3600_000).toISOString();
+    mockFetchBaroData.mockResolvedValue(
+      baroData({
+        activation,
+        expiry: new Date(Date.now() + 3600_000).toISOString(),
+        inventory: [{ uniqueName: "/Lotus/Foo", item: "Primed Flow", ducats: 300, credits: 175000 }],
+      })
+    );
+
+    await baroArrivalJob();
+
+    expect(mockMarkNotified).toHaveBeenCalledWith(activation);
   });
 
   it("handles active Baro with empty inventory after all retries exhausted (still notifies)", async () => {
