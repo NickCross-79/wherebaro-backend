@@ -180,6 +180,52 @@ describe("baroReconcile.job", () => {
     expect(mockSendArrival).toHaveBeenCalled();
   });
 
+  it("treats a differently-formatted activation as the same cycle", async () => {
+    // World state rebuilds timestamps through toISOString() (always .000Z) while
+    // the primary API serializes its own way. Reading that as a different cycle
+    // would repair and re-announce an arrival that already went out.
+    mockFetchBaroData.mockResolvedValue(liveBaro({ activation: "2026-08-21T13:00:00.000Z" }));
+    mockFetchCurrent.mockResolvedValue(
+      brokenCurrent({
+        isActive: true,
+        items: [{ name: "Primed Flow" }],
+        activation: "2026-08-21T13:00:00Z",
+      })
+    );
+
+    const result = await baroReconcileJob();
+
+    expect(result).toMatchObject({ repaired: false, reason: "already-consistent" });
+    expect(mockSendArrival).not.toHaveBeenCalled();
+  });
+
+  it("repairs without notifying when the document is already active for this cycle", async () => {
+    // The state left by a manual arrival run that predates the notified stamp:
+    // Baro is announced and active, but the inventory needs repair. Repairing is
+    // right; announcing his arrival a second time is not.
+    mockFetchBaroData.mockResolvedValue(liveBaro());
+    mockFetchCurrent.mockResolvedValue(
+      brokenCurrent({ isActive: true, items: [], arrivalNotifiedFor: undefined })
+    );
+
+    const result = await baroReconcileJob();
+
+    expect(result).toMatchObject({ repaired: true, notificationSent: false });
+    expect(mockUpsert).toHaveBeenCalled();
+    expect(mockSendArrival).not.toHaveBeenCalled();
+  });
+
+  it("still notifies when the document was never marked active", async () => {
+    // The outage state proper — nothing ever announced this arrival
+    mockFetchBaroData.mockResolvedValue(liveBaro());
+    mockFetchCurrent.mockResolvedValue(brokenCurrent({ isActive: false, arrivalNotifiedFor: undefined }));
+
+    const result = await baroReconcileJob();
+
+    expect(result).toMatchObject({ repaired: true, notificationSent: true });
+    expect(mockSendArrival).toHaveBeenCalledTimes(1);
+  });
+
   it("does not stamp an empty inventory over the document", async () => {
     // Upstream says active but has published no manifest — writing that would
     // destroy nothing useful and make the next run think it is consistent
