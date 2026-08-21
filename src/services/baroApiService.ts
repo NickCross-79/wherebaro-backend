@@ -98,6 +98,7 @@ export async function fetchFromWorldState(): Promise<BaroApiResponse> {
  * Falls back to parsing the raw Warframe world state if the primary API:
  * - Returns an HTTP error or invalid data
  * - Reports Baro as active but returns an empty inventory
+ * - Reports Baro as absent while still serving an already-expired cycle
  */
 export async function fetchBaroData(): Promise<BaroApiResponse> {
     if (WARFRAMESTAT_DISABLED) {
@@ -121,6 +122,26 @@ export async function fetchBaroData(): Promise<BaroApiResponse> {
                 console.warn("[Baro API] World state also returned empty inventory — using primary response");
             } catch (fallbackError) {
                 console.warn("[Baro API] World state fallback failed, using primary response:", fallbackError);
+            }
+        } else if (!active && isStaleCycle(data.expiry)) {
+            // The primary is serving a cycle that already expired, which means it has
+            // not published the new one yet — the usual state right at an arrival
+            // boundary. Reporting "not active" here is what silently skipped a whole
+            // arrival: the world state flips exactly on time, so ask it directly
+            // rather than trusting a stale "absent".
+            console.warn(`[Baro API] Primary API returned an already-expired cycle (expiry: ${data.expiry}), cross-checking world state...`);
+            try {
+                const fallback = await fetchFromWorldState();
+                if (!isStaleCycle(fallback.expiry)) {
+                    console.log(
+                        `[Baro API] World state has a newer cycle (activation: ${fallback.activation}, ` +
+                        `active: ${isBaroActive(fallback.activation, fallback.expiry)}, ${fallback.inventory.length} items) — using it`
+                    );
+                    return fallback;
+                }
+                console.warn("[Baro API] World state is serving the same expired cycle — using primary response");
+            } catch (fallbackError) {
+                console.warn("[Baro API] World state cross-check failed, using primary response:", fallbackError);
             }
         }
 
@@ -147,4 +168,18 @@ export async function fetchBaroData(): Promise<BaroApiResponse> {
  */
 export function isBaroActive(activation: string, expiry: string, now: Date = new Date()): boolean {
     return now >= new Date(activation) && now <= new Date(expiry);
+}
+
+/**
+ * Checks whether a response describes a cycle that has already ended.
+ *
+ * This distinguishes the two very different reasons an API reports Baro as
+ * absent:
+ *   - expiry in the future  → a genuine gap between visits; the next cycle is
+ *                             already published and "absent" is the truth.
+ *   - expiry in the past    → the source is lagging and still serving the last
+ *                             visit, so "absent" cannot be trusted.
+ */
+export function isStaleCycle(expiry: string, now: Date = new Date()): boolean {
+    return new Date(expiry) <= now;
 }

@@ -1,5 +1,5 @@
 /**
- * Scheduled: Baro Arrival — Friday 9:00 AM EDT (13:00 UTC)
+ * Scheduled: Baro Arrival — Friday 13:02 UTC (just after Baro's 13:00 activation)
  *
  * Consolidates the entire Friday Baro flow into a single timer:
  * API health check → inventory resolution → DB update → notifications.
@@ -18,8 +18,12 @@ export async function baroArrival(myTimer: Timer, context: InvocationContext): P
     }
 }
 
-// Schedule the timer to run every Friday at 9:00 AM EDT (13:00 UTC)
+// Every Friday at 13:02 UTC. Baro activates exactly at 13:00 UTC, and firing on
+// that same instant left no margin at all: the timer can fire fractionally early
+// (making Baro read as not-yet-active) and every upstream source is still
+// serving the previous cycle. The two-minute offset costs nothing and starts the
+// job from a state the APIs can actually describe.
 app.timer("baroArrival", {
-    schedule: "0 0 13 * * Fri",
+    schedule: "0 2 13 * * Fri",
     handler: baroArrival,
 });
