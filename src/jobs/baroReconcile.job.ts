@@ -18,6 +18,22 @@
  * arrivalNotifiedFor stamp makes the notification exactly-once per cycle.
  */
 import { fetchBaroData, isBaroActive } from "../services/baroApiService";
+
+/**
+ * Compares two cycle timestamps by instant rather than by string.
+ *
+ * The same activation reaches us serialized differently depending on the
+ * source — the world state is rebuilt through toISOString() and always carries
+ * milliseconds, the primary API serializes its own way. Comparing the raw
+ * strings would read a formatting difference as a different cycle, and on this
+ * job that means "repair and notify" — a duplicate arrival push to every user.
+ */
+function isSameCycle(a?: string, b?: string): boolean {
+    if (!a || !b) return false;
+    const left = new Date(a).getTime();
+    const right = new Date(b).getTime();
+    return Number.isFinite(left) && left === right;
+}
 import { resolveBaroInventory } from "../services/itemService";
 import { fetchCurrent, upsertCurrent, markArrivalNotified } from "../services/currentService";
 import { sendBaroArrivalNotification, sendWishlistMatchNotification } from "../services/notificationService";
@@ -34,7 +50,7 @@ export async function baroReconcileJob() {
     const current = await fetchCurrent();
     const storedIsActive = current.isActive === true;
     const storedHasItems = (current.items?.length ?? 0) > 0;
-    const storedCycleMatches = current.activation === baroData.activation;
+    const storedCycleMatches = isSameCycle(current.activation, baroData.activation);
 
     // Healthy: the document already describes this cycle, is marked active and
     // carries a manifest. Nothing to do.
@@ -68,7 +84,14 @@ export async function baroReconcileJob() {
     console.log(`[Baro Reconcile] Repaired current — ${inventoryIds.length} items`);
 
     // Notify only if this cycle never got an arrival notification.
-    const alreadyNotified = current.arrivalNotifiedFor === baroData.activation;
+    //
+    // The stamp is the direct evidence, but a document already marked active for
+    // this same cycle is evidence too: something announced this arrival before we
+    // got here — the arrival job, or a manual run predating the stamp. Repairing
+    // an inventory is not a reason to announce Baro twice.
+    const alreadyNotified =
+        isSameCycle(current.arrivalNotifiedFor, baroData.activation) ||
+        (storedIsActive && storedCycleMatches);
     let notificationSent = false;
     let wishlistSent = 0;
 
