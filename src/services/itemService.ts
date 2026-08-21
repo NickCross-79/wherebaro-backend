@@ -2,6 +2,7 @@ import { collections, connectToDatabase } from "../db/database.service";
 import { ObjectId } from "mongodb";
 import Item from "../models/Item";
 import { isIgnoredBaroItem } from "../utils/itemMappings";
+import { escapeRegex } from "../utils/regex";
 import { BaroApiInventoryItem } from "./baroApiService";
 import {
     WfcdItem,
@@ -17,12 +18,56 @@ import { generateModImage } from "./modGeneratorLoader";
 // ─── DB Lookup ───────────────────────────────────────────────────────────────
 
 /**
- * Finds an existing DB item by exact uniqueName key match.
+ * Builds the canonical uniqueName we store for an item: the `/Lotus/<key>` form,
+ * with any `/StoreItems` segment stripped. The Baro API serves store paths
+ * (`/Lotus/StoreItems/Types/...`) while the world state and @wfcd/items serve the
+ * plain form, so the same item arrives spelled two ways depending on the source.
+ * Normalizing on write keeps one item from being stored under both.
  */
-async function findItemByKey(key: string) {
-    return collections.items!.findOne({
-        uniqueName: `/Lotus/${key}`,
-    });
+function canonicalUniqueName(uniqueName: string): string {
+    return `/Lotus/${getUniqueNameKey(uniqueName)}`;
+}
+
+/**
+ * Finds the existing DB document for a Baro inventory entry, if there is one.
+ *
+ * Identity has to be decided the same way everywhere that writes to this
+ * collection, or the same item ends up stored twice. The wiki sync matches names
+ * case-insensitively, so this must too: matching only byte-for-byte meant any
+ * drift between the wiki's spelling and the API's — a capital letter, a
+ * different apostrophe — read as a brand new item. The duplicate is then
+ * inserted with `offeringDates: [today]`, and a single offering date is exactly
+ * what the app renders as a NEW badge, so a long-standing item comes back
+ * flagged as never seen before.
+ *
+ * Ordered cheapest first; the exact match is the common case.
+ */
+async function findExistingBaroItem(entry: BaroApiInventoryItem) {
+    const items = collections.items!;
+
+    // 1. Exact name
+    const exact = await items.findOne({ name: entry.item });
+    if (exact) return exact;
+
+    // 2. Case-insensitive name — the rule syncService uses to decide the same question
+    if (entry.item) {
+        const caseInsensitive = await items.findOne({
+            name: { $regex: new RegExp(`^${escapeRegex(entry.item)}$`, "i") },
+        });
+        if (caseInsensitive) return caseInsensitive;
+    }
+
+    // 3. uniqueName key, accepting either stored prefix form. Items backfilled
+    //    from a raw Baro API path still carry the `/Lotus/StoreItems/...` spelling.
+    if (entry.uniqueName) {
+        const key = getUniqueNameKey(entry.uniqueName);
+        const byKey = await items.findOne({
+            uniqueName: { $in: [`/Lotus/${key}`, `/Lotus/StoreItems/${key}`] },
+        });
+        if (byKey) return byKey;
+    }
+
+    return null;
 }
 
 // ─── Item Resolution ─────────────────────────────────────────────────────────
@@ -42,29 +87,20 @@ async function resolveOrInsertItem(
         throw new Error("Items collection not initialized");
     }
 
-    // Primary: match by name
-    const nameMatch = await collections.items.findOne({ name: entry.item });
+    const existing = await findExistingBaroItem(entry);
 
-    if (nameMatch) {
+    if (existing) {
         const update: any = { $addToSet: { offeringDates: today } };
-        if (!nameMatch.uniqueName) {
-            update.$set = { uniqueName: entry.uniqueName };
-            console.log(`[Item Service] Matched "${entry.item}" by name, backfilled uniqueName: ${entry.uniqueName}`);
+        if (!existing.uniqueName && entry.uniqueName) {
+            // Store the canonical form, not the raw API path — the raw store path
+            // is not what the uniqueName lookup searches for, so backfilling it
+            // verbatim left the item unfindable by key on the next visit.
+            const canonical = canonicalUniqueName(entry.uniqueName);
+            update.$set = { uniqueName: canonical };
+            console.log(`[Item Service] Matched "${entry.item}", backfilled uniqueName: ${canonical}`);
         }
-        await collections.items.updateOne({ _id: nameMatch._id }, update);
-        return nameMatch._id;
-    }
-
-    // Fallback: match by uniqueName key
-    const key = getUniqueNameKey(entry.uniqueName);
-    const existingItem = await findItemByKey(key);
-
-    if (existingItem) {
-        await collections.items.updateOne(
-            { _id: existingItem._id },
-            { $addToSet: { offeringDates: today } }
-        );
-        return existingItem._id;
+        await collections.items.updateOne({ _id: existing._id }, update);
+        return existing._id;
     }
 
     // Look up in @wfcd/items for metadata

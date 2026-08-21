@@ -1,4 +1,5 @@
 import { collections, connectToDatabase } from "../db/database.service";
+import { escapeRegex } from "../utils/regex";
 import Item from "../models/Item";
 
 /** Fields that should be updated from wiki data */
@@ -110,6 +111,3 @@ export async function syncItems(wikiItems: Item[]): Promise<SyncResult> {
 }
 
 
-function escapeRegex(str: string): string {
-    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}

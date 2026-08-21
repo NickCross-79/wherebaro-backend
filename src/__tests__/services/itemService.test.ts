@@ -150,7 +150,11 @@ describe("itemService", () => {
       const col = mockItemsCollection(
         {
           findOne: jest.fn().mockImplementation((query: any) => {
-            if (query?.uniqueName === existingUniqueName) {
+            // The key lookup accepts either stored prefix form, so it queries
+            // with $in rather than a bare string
+            const candidates: string[] = query?.uniqueName?.$in
+              ?? (typeof query?.uniqueName === "string" ? [query.uniqueName] : []);
+            if (candidates.includes(existingUniqueName)) {
               return Promise.resolve({ _id: existingId, uniqueName: existingUniqueName });
             }
             return Promise.resolve(null);
@@ -168,6 +172,104 @@ describe("itemService", () => {
         { _id: existingId },
         { $addToSet: { offeringDates: expect.any(String) } }
       );
+    });
+
+    /**
+     * Regression cover for the false NEW badge.
+     *
+     * The app flags an item as NEW when it has exactly one offering date. A
+     * duplicate document is inserted with `offeringDates: [today]`, so any
+     * failure to recognise an existing item resurfaces a long-standing item as
+     * brand new. Identity therefore has to survive the ways a name legitimately
+     * differs between the wiki (which seeds the DB) and the Baro API.
+     */
+    describe("existing-item identity", () => {
+      /** Mocks findOne so only `storedName` matches, exactly or case-insensitively. */
+      function mockStoredByName(storedName: string, storedId: ObjectId, uniqueName?: string) {
+        return mockItemsCollection({
+          findOne: jest.fn().mockImplementation((query: any) => {
+            if (typeof query?.name === "string") {
+              return Promise.resolve(query.name === storedName ? { _id: storedId, uniqueName } : null);
+            }
+            if (query?.name?.$regex instanceof RegExp) {
+              return Promise.resolve(query.name.$regex.test(storedName) ? { _id: storedId, uniqueName } : null);
+            }
+            return Promise.resolve(null);
+          }),
+        });
+      }
+
+      it("matches an existing item whose stored name differs only by case", async () => {
+        const existingId = new ObjectId();
+        const col = mockStoredByName("Masker's Theodolite CrewSuit", existingId, "/Lotus/Types/X");
+        mockUnknownItemsCollection();
+
+        const result = await resolveBaroInventory([
+          inventoryEntry({ item: "Masker's Theodolite Crewsuit", uniqueName: "/Lotus/StoreItems/Types/X" }),
+        ]);
+
+        expect(result.inventoryIds).toEqual([existingId]);
+        expect(result.unmatchedItems).toEqual([]);
+        expect(col.insertOne).not.toHaveBeenCalled();
+        expect(col.updateOne).toHaveBeenCalledWith(
+          { _id: existingId },
+          { $addToSet: { offeringDates: expect.any(String) } }
+        );
+      });
+
+      it("matches an existing item stored with the /Lotus/StoreItems/ prefix", async () => {
+        // Items whose uniqueName was backfilled from a raw Baro API path keep the
+        // store spelling; the key lookup must still find them
+        const existingId = new ObjectId();
+        const stored = "/Lotus/StoreItems/Types/Items/ShipDecos/Thing";
+        const col = mockItemsCollection({
+          findOne: jest.fn().mockImplementation((query: any) => {
+            const candidates: string[] = query?.uniqueName?.$in ?? [];
+            return Promise.resolve(candidates.includes(stored) ? { _id: existingId, uniqueName: stored } : null);
+          }),
+        });
+        mockUnknownItemsCollection();
+
+        const result = await resolveBaroInventory([
+          inventoryEntry({ item: "Some Renamed Deco", uniqueName: "/Lotus/Types/Items/ShipDecos/Thing" }),
+        ]);
+
+        expect(result.inventoryIds).toEqual([existingId]);
+        expect(col.insertOne).not.toHaveBeenCalled();
+      });
+
+      it("backfills a missing uniqueName in canonical form, not the raw store path", async () => {
+        // Storing the raw path left the item unfindable by key on the next visit
+        const existingId = new ObjectId();
+        const col = mockStoredByName("Ki'Teer Domestik Drone", existingId, undefined);
+        mockUnknownItemsCollection();
+
+        await resolveBaroInventory([
+          inventoryEntry({
+            item: "Ki'Teer Domestik Drone",
+            uniqueName: "/Lotus/StoreItems/Types/Items/ShipDecos/LisetPropCleaningDroneBaro",
+          }),
+        ]);
+
+        expect(col.updateOne).toHaveBeenCalledWith(
+          { _id: existingId },
+          expect.objectContaining({
+            $set: { uniqueName: "/Lotus/Types/Items/ShipDecos/LisetPropCleaningDroneBaro" },
+          })
+        );
+      });
+
+      it("still records a genuinely unknown item rather than matching something else", async () => {
+        const col = mockItemsCollection({ findOne: jest.fn().mockResolvedValue(null) });
+        mockUnknownItemsCollection();
+
+        const result = await resolveBaroInventory([
+          inventoryEntry({ item: "Totally Fictional Item", uniqueName: "/Lotus/Nope/Nothing" }),
+        ]);
+
+        expect(result.inventoryIds).toEqual([]);
+        expect(result.unmatchedItems).toEqual(["Totally Fictional Item"]);
+      });
     });
 
     it("creates new item when not found in DB but matched via wfcd", async () => {
