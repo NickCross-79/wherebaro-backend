@@ -287,14 +287,52 @@ Azure Timer Trigger (CRON schedule)
 
 ### Admin / Manual
 
-| Method | Route | Description |
-|---|---|---|
-| GET | `/baroVisitUpdateManual` | Manually trigger Baro data update |
-| GET | `/baroNotificationCheckManual?type={type}` | Manually trigger notifications (`arrival`, `departingSoon`, `departure`, `all`) |
-| POST | `/sendTestNotification` | Send test notification to all devices |
-| GET | `/seedDBFunction` | Seed DB from wiki scrape |
-| GET | `/backfillUniqueNames` | Backfill `uniqueName` on existing items |
-| GET | `/mockBaroAbsent` | DEV: Returns mock Baro-absent data |
+Routes marked 🔒 require `Authorization: Bearer {ADMIN_API_KEY}` and return
+`401` without it — see [Admin authentication](#admin-authentication) below.
+They are the ones the Whenbaro Admin app triggers.
+
+| Method | Route | Auth | Description |
+|---|---|---|---|
+| GET/POST | `/syncItemsManual` | 🔒 | Run the weekly wiki item sync |
+| POST | `/baroResyncInventory` | 🔒 | Re-resolve Baro's manifest into `current`. Sends no notifications — safe mid-visit and safe to repeat |
+| POST | `/baroArrivalManual` | 🔒 | Full arrival flow. **Notifies every registered device**, plus wishlist matches |
+| POST | `/baroDepartureManual` | 🔒 | Full departure flow. **Notifies every registered device** and clears all votes |
+| GET/POST | `/baroDepartingSoonManual` | — | Send the departing-soon warning notification |
+| GET/POST | `/baroReconcileManual` | — | Repair `current` and send a missed arrival notification |
+| GET/POST | `/sendTestNotification` | — | Send test notification to all devices |
+| GET/POST | `/seedDBFunction` | — | Seed DB from wiki scrape |
+| GET/POST | `/backfillItemData` | — | Backfill item data on existing items |
+| GET | `/mockBaroAbsent` | — | DEV: Returns mock Baro-absent data |
+
+### Admin authentication
+
+Admin routes are registered with `authLevel: "anonymous"` so the admin app does
+not need a Functions host key. The bearer token in `ADMIN_API_KEY` is therefore
+the only thing between the public internet and jobs that rewrite the `current`
+document and push notifications to every registered device.
+
+`ADMIN_API_KEY` is an **application setting on the Function App**, not a value in
+this repo. The check in [`src/utils/auth.ts`](src/utils/auth.ts):
+
+- **fails closed** — with no `ADMIN_API_KEY` set, every guarded route returns 401
+  and logs an error naming the missing setting, rather than serving the request
+  to anyone who knows the URL;
+- compares the token in **constant time**;
+- accepts only the exact `Bearer {key}` form.
+
+> **Deploying this:** set `ADMIN_API_KEY` in the Function App's application
+> settings and build the admin app with a matching `EXPO_PUBLIC_ADMIN_API_KEY`
+> *before* rolling out, or the admin app's buttons will start returning 401.
+
+Add the guard to a new admin route with `requireAdminAuth`:
+
+```ts
+export async function myAdminHttp(request: HttpRequest, context: InvocationContext) {
+    const denied = requireAdminAuth(request, context, "my operation");
+    if (denied) return denied;
+    // ...
+}
+```
 
 ---
 
