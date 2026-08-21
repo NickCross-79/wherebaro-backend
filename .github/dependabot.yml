@@ -1,0 +1,30 @@
+# Keeps @wfcd/items current without anyone having to watch npm.
+#
+# A stale @wfcd/items cannot resolve items Digital Extremes has only just added,
+# which is how a new item silently fails to make it into Baro's stored inventory.
+# The check is timed for Friday morning so a fresh release is in place before the
+# arrival job runs at 13:02 UTC.
+#
+# Scoped deliberately to @wfcd/items alone: it is a data package, which is what
+# makes unattended merging reasonable. Widening `allow` would put other packages
+# on the same auto-merge path, and a code dependency deserves a human look.
+version: 2
+
+updates:
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "friday"
+      # Roughly 7 hours ahead of Baro's 13:00 UTC arrival, leaving room for CI,
+      # merge and deploy. Dependabot treats scheduled times as best-effort.
+      time: "06:00"
+      timezone: "Etc/UTC"
+    allow:
+      - dependency-name: "@wfcd/items"
+    commit-message:
+      prefix: "chore"
+      include: "scope"
+    labels:
+      - "dependencies"
+    open-pull-requests-limit: 5
