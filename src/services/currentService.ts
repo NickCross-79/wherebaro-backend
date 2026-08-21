@@ -17,6 +17,12 @@ export interface CurrentBaroData {
     expiry: string;
     location: string;
     items: any[];
+    /**
+     * Activation timestamp of the cycle we have already sent an arrival
+     * notification for. Lets the reconcile job repair a missed arrival without
+     * re-notifying users who were told the first time.
+     */
+    arrivalNotifiedFor?: string;
 }
 
 // ─── Exported Functions ──────────────────────────────────────────────────────
@@ -34,7 +40,7 @@ export async function fetchCurrent(): Promise<CurrentBaroData> {
 
     const record = await collections.current.findOne({});
     if (!record) {
-        return { isActive: false, activation: new Date().toISOString(), expiry: new Date().toISOString(), location: "", items: [] };
+        return { isActive: false, activation: new Date().toISOString(), expiry: new Date().toISOString(), location: "", items: [], arrivalNotifiedFor: undefined };
     }
 
     // Populate inventory with full item objects if Baro is active
@@ -51,6 +57,7 @@ export async function fetchCurrent(): Promise<CurrentBaroData> {
             expiry: record.expiry,
             location: record.location,
             items: fullItems,
+            arrivalNotifiedFor: record.arrivalNotifiedFor,
         };
     }
 
@@ -60,6 +67,7 @@ export async function fetchCurrent(): Promise<CurrentBaroData> {
         expiry: record.expiry,
         location: record.location,
         items: [],
+        arrivalNotifiedFor: record.arrivalNotifiedFor,
     };
 }
 
@@ -93,4 +101,21 @@ export async function upsertCurrent(
         },
         { upsert: true }
     );
+}
+
+/**
+ * Records that an arrival notification has been sent for the given cycle.
+ *
+ * Stored as the cycle's activation timestamp rather than a boolean so it
+ * self-expires: the next visit has a different activation, so the flag never
+ * needs clearing and can never suppress a later arrival.
+ */
+export async function markArrivalNotified(activation: string): Promise<void> {
+    await connectToDatabase();
+
+    if (!collections.current) {
+        throw new Error("Current collection not initialized");
+    }
+
+    await collections.current.updateOne({}, { $set: { arrivalNotifiedFor: activation } }, { upsert: true });
 }
