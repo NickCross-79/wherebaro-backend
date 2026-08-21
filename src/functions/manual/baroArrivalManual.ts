@@ -1,11 +1,19 @@
 /**
  * Manual trigger for the Friday Baro Arrival scheduled job.
  * Runs the full flow: API health check → inventory resolution → DB update → notifications.
+ *
+ * Admin only: requires the API key in the Authorization header. Triggered from
+ * the Whenbaro Admin app. This job pushes a notification to every registered
+ * device, so it must never be reachable without the key.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { baroArrivalJob } from "../../jobs/baroArrival.job";
+import { requireAdminAuth } from "../../utils/auth";
 
 export async function baroArrivalManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "Baro arrival");
+    if (denied) return denied;
+
     context.log(`[Manual] Baro arrival job triggered at ${new Date().toISOString()}`);
 
     try {
@@ -27,7 +35,7 @@ export async function baroArrivalManualHttp(request: HttpRequest, context: Invoc
 }
 
 app.http("baroArrivalManual", {
-    methods: ["GET", "POST"],
+    methods: ["POST"],
     authLevel: "anonymous",
     handler: baroArrivalManualHttp,
 });

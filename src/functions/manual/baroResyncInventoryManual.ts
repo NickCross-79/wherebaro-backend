@@ -5,11 +5,18 @@
  * For fixing an incomplete manifest mid-visit — e.g. after updating
  * @wfcd/items so a new item can finally be resolved — when users have already
  * received the arrival notification for this visit.
+ *
+ * Admin only: requires the API key in the Authorization header. Triggered from
+ * the Whenbaro Admin app.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { baroResyncInventoryJob } from "../../jobs/baroResyncInventory.job";
+import { requireAdminAuth } from "../../utils/auth";
 
 export async function baroResyncInventoryManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "Baro inventory resync");
+    if (denied) return denied;
+
     context.log(`[Manual] Baro inventory resync triggered at ${new Date().toISOString()}`);
 
     try {
@@ -31,7 +38,7 @@ export async function baroResyncInventoryManualHttp(request: HttpRequest, contex
 }
 
 app.http("baroResyncInventory", {
-    methods: ["GET", "POST"],
+    methods: ["POST"],
     authLevel: "anonymous",
     handler: baroResyncInventoryManualHttp,
 });
