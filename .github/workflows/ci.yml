@@ -1,0 +1,40 @@
+# Validates a change before it can reach main — and therefore production, since
+# a push to main deploys straight to the function app.
+#
+# This exists so dependency updates are not merged blind. Mark `build-and-test`
+# as a required status check on main, otherwise auto-merge has nothing to wait
+# for and will merge the moment the PR opens.
+name: CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '22.x'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node ${{ env.NODE_VERSION }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      # `npm install`, not `npm ci`, to match the deploy workflow. The lockfile
+      # is currently out of sync with package.json, so `npm ci` fails outright.
+      - name: Install dependencies
+        run: npm install
+
+      - name: Report resolved @wfcd/items version
+        run: npm ls @wfcd/items || true
+
+      - name: Build
+        run: npm run build
+
+      - name: Test
+        run: npm test
