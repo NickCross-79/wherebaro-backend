@@ -1,7 +1,7 @@
 /**
  * Tests for baroApiService
  */
-import { fetchBaroData, isBaroActive } from "../../services/baroApiService";
+import { fetchBaroData, isBaroActive, isStaleCycle } from "../../services/baroApiService";
 
 // ─── Mock global fetch ───────────────────────────────────────────────────────
 
@@ -19,8 +19,11 @@ const mockFetchWorldStateTrader = fetchWorldStateTrader as jest.MockedFunction<t
 function baroResponse(overrides: Record<string, any> = {}) {
   return {
     id: "baro-1",
-    activation: "2025-01-10T14:00:00.000Z",
-    expiry: "2025-01-12T14:00:00.000Z",
+    // A live visit window by default. These must stay relative: a hardcoded past
+    // date reads as a cycle the API has failed to roll over, which now triggers
+    // the world state cross-check.
+    activation: new Date(Date.now() - 3600_000).toISOString(),
+    expiry: new Date(Date.now() + 47 * 3600_000).toISOString(),
     location: "Strata Relay",
     inventory: [
       { uniqueName: "/Lotus/Foo", item: "Primed Flow", ducats: 300, credits: 175000 },
@@ -151,6 +154,97 @@ describe("baroApiService", () => {
       mockFetchWorldStateTrader.mockRejectedValueOnce(new Error("World state also down"));
 
       await expect(fetchBaroData()).rejects.toThrow("Warframestat API error: 503 Service Unavailable");
+    });
+  });
+
+  // ── fetchBaroData (fallback – stale cycle) ─────────────────────────────────
+
+  describe("fetchBaroData – cross-check on stale cycle", () => {
+    /**
+     * Regression cover for the missed arrival: at Baro's activation instant the
+     * primary API is still serving the previous visit, so Baro reads as absent.
+     * The world state flips on time, so an expired cycle from the primary must
+     * never be taken at face value.
+     */
+    const expiredCycle = () => ({
+      activation: new Date(Date.now() - 14 * 24 * 3600_000).toISOString(),
+      expiry: new Date(Date.now() - 12 * 24 * 3600_000).toISOString(),
+      inventory: [],
+    });
+
+    const liveCycle = () => ({
+      activation: new Date(Date.now() - 60_000).toISOString(),
+      expiry: new Date(Date.now() + 47 * 3600_000).toISOString(),
+    });
+
+    it("uses world state when the primary is still serving an expired cycle", async () => {
+      mockFetch.mockResolvedValueOnce(okResponse(baroResponse(expiredCycle())));
+      mockFetchWorldStateTrader.mockResolvedValueOnce(worldStateTrader(liveCycle()));
+
+      const result = await fetchBaroData();
+
+      expect(result.source).toBe("worldstate");
+      expect(isBaroActive(result.activation, result.expiry)).toBe(true);
+      expect(result.inventory).toHaveLength(1);
+      expect(mockFetchWorldStateTrader).toHaveBeenCalledTimes(1);
+    });
+
+    it("does NOT cross-check when Baro is genuinely between visits", async () => {
+      // Next cycle already published: absent is the truth, not upstream lag
+      mockFetch.mockResolvedValueOnce(
+        okResponse(
+          baroResponse({
+            activation: new Date(Date.now() + 5 * 24 * 3600_000).toISOString(),
+            expiry: new Date(Date.now() + 7 * 24 * 3600_000).toISOString(),
+            inventory: [],
+          })
+        )
+      );
+
+      const result = await fetchBaroData();
+
+      expect(result.source).toBe("warframestat");
+      expect(mockFetchWorldStateTrader).not.toHaveBeenCalled();
+    });
+
+    it("keeps the primary response when world state is equally stale", async () => {
+      mockFetch.mockResolvedValueOnce(okResponse(baroResponse(expiredCycle())));
+      mockFetchWorldStateTrader.mockResolvedValueOnce(worldStateTrader(expiredCycle()));
+
+      const result = await fetchBaroData();
+
+      expect(result.source).toBe("warframestat");
+    });
+
+    it("keeps the primary response when the cross-check throws", async () => {
+      mockFetch.mockResolvedValueOnce(okResponse(baroResponse(expiredCycle())));
+      mockFetchWorldStateTrader.mockRejectedValueOnce(new Error("World state down"));
+
+      const result = await fetchBaroData();
+
+      expect(result.source).toBe("warframestat");
+    });
+  });
+
+  // ── isStaleCycle ───────────────────────────────────────────────────────────
+
+  describe("isStaleCycle", () => {
+    const now = new Date("2026-08-21T14:26:00.000Z");
+
+    it("flags a cycle that already ended", () => {
+      expect(isStaleCycle("2026-08-09T13:00:00.000Z", now)).toBe(true);
+    });
+
+    it("does not flag a cycle still in progress", () => {
+      expect(isStaleCycle("2026-08-23T13:00:00.000Z", now)).toBe(false);
+    });
+
+    it("does not flag a cycle that has not started yet", () => {
+      expect(isStaleCycle("2026-09-06T13:00:00.000Z", now)).toBe(false);
+    });
+
+    it("treats the exact expiry instant as stale", () => {
+      expect(isStaleCycle("2026-08-21T14:26:00.000Z", now)).toBe(true);
     });
   });
 
