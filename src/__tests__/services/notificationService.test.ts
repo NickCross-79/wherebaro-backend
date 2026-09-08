@@ -50,6 +50,43 @@ describe("notificationService", () => {
     mockIsExpoPushToken.mockReturnValue(true);
   });
 
+  // ── Per-type opt-out ───────────────────────────────────────────────────────
+
+  describe("notification type preferences", () => {
+    // Each Baro notification must ask getActivePushTokens for the audience that
+    // opted in to that type. Passing no type asks for every active token, which
+    // is how "Baro is leaving soon" used to reach people who had turned
+    // departure alerts off.
+    beforeEach(() => {
+      mockGetActiveTokens.mockResolvedValue([]);
+    });
+
+    it("sends the arrival notification only to arrival subscribers", async () => {
+      await sendBaroArrivalNotification("Larunda Relay");
+      expect(mockGetActiveTokens).toHaveBeenCalledWith("arrival");
+    });
+
+    it("sends the departure notification only to departure subscribers", async () => {
+      await sendBaroDepartureNotification();
+      expect(mockGetActiveTokens).toHaveBeenCalledWith("departure");
+    });
+
+    it("sends the departing-soon warning only to departure subscribers", async () => {
+      await sendBaroDepartingSoonNotification(3);
+      expect(mockGetActiveTokens).toHaveBeenCalledWith("departure");
+    });
+
+    it("never asks for the unfiltered audience for a Baro notification", async () => {
+      await sendBaroArrivalNotification("Larunda Relay");
+      await sendBaroDepartingSoonNotification(3);
+      await sendBaroDepartureNotification();
+
+      for (const call of mockGetActiveTokens.mock.calls) {
+        expect(call[0]).toBeDefined();
+      }
+    });
+  });
+
   // ── sendPushNotifications ──────────────────────────────────────────────────
 
   describe("sendPushNotifications", () => {

@@ -136,13 +136,18 @@ export async function sendBaroArrivalNotification(location: string): Promise<voi
 }
 
 /**
- * Send Baro departing soon notification
+ * Send Baro departing soon notification.
+ *
+ * Gated on the departure preference: this announces Baro leaving, so someone who
+ * turned departure alerts off does not want it either. Without the type argument
+ * it went to every active token regardless of preference.
  */
 export async function sendBaroDepartingSoonNotification(hoursRemaining: number): Promise<void> {
   await sendPushNotifications(
     'Baro is leaving soon!',
     `Only ${hoursRemaining} hours remaining to visit Baro Ki'teer`,
-    { type: 'baro-leaving-soon', hoursRemaining }
+    { type: 'baro-leaving-soon', hoursRemaining },
+    'departure'
   );
 }
 
