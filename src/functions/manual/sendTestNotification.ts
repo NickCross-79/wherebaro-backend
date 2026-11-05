@@ -2,9 +2,13 @@
  * Manual trigger: Send a test push notification to all registered devices.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireAdminAuth } from "../../utils/auth";
 import { sendTestNotification } from "../../jobs/testNotification.job";
 
 export async function sendTestNotificationManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "test notification");
+    if (denied) return denied;
+
     context.log(`[Manual] Test notification triggered at ${new Date().toISOString()}`);
 
     try {

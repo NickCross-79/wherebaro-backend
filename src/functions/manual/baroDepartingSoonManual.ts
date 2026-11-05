@@ -3,9 +3,13 @@
  * Checks if Baro is still active and sends a warning notification.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireAdminAuth } from "../../utils/auth";
 import { baroDepartingSoonJob } from "../../jobs/baroDepartingSoon.job";
 
 export async function baroDepartingSoonManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "Baro departing soon");
+    if (denied) return denied;
+
     context.log(`[Manual] Baro departing soon job triggered at ${new Date().toISOString()}`);
 
     try {

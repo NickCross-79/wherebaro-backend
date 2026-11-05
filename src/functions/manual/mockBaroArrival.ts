@@ -12,6 +12,7 @@
  * Update the document in MongoDB Atlas to change mock behavior without redeploying.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireAdminAuth } from "../../utils/auth";
 import { connectToDatabase, db } from "../../db/database.service";
 import { resolveBaroInventory } from "../../services/itemService";
 import { upsertCurrent } from "../../services/currentService";
@@ -20,6 +21,9 @@ import { getWishlistMatchesForCurrentInventory } from "../../services/wishlistSe
 import { BaroApiInventoryItem } from "../../services/baroApiService";
 
 export async function mockBaroArrivalHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "mock Baro arrival");
+    if (denied) return denied;
+
     context.log(`[Mock Arrival] Triggered at ${new Date().toISOString()}`);
 
     try {
