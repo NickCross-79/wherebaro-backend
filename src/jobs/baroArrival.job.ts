@@ -12,7 +12,7 @@
  */
 import { fetchBaroData, isBaroActive, isStaleCycle, BaroApiResponse } from "../services/baroApiService";
 import { resolveBaroInventory } from "../services/itemService";
-import { upsertCurrent, markArrivalNotified } from "../services/currentService";
+import { upsertCurrent, claimArrivalNotification, releaseArrivalNotification } from "../services/currentService";
 import { sendBaroArrivalNotification, sendWishlistMatchNotification } from "../services/notificationService";
 import { getWishlistMatchesForCurrentInventory } from "../services/wishlistService";
 
@@ -105,30 +105,43 @@ export async function baroArrivalJob() {
     await upsertCurrent(true, baroData.activation, baroData.expiry, baroData.location, inventoryIds);
     console.log(`[Baro Arrival] Updated DB — ${inventoryIds.length} items (source: ${baroData.source})`);
 
-    // Send arrival notification to all users, then record the cycle so the
-    // reconcile job can repair this document later without re-notifying.
-    await sendBaroArrivalNotification(baroData.location);
-    await markArrivalNotified(baroData.activation);
-
-    // Send targeted wishlist notifications
+    // Claim this cycle's arrival notification before sending. The reconcile job
+    // runs at :05 while this job may still be retrying, and both can decide the
+    // arrival needs announcing; the atomic claim guarantees only one of them
+    // pushes to every device. If the send itself fails, release the claim so the
+    // reconcile job can try again rather than the arrival going unannounced.
+    const claimed = await claimArrivalNotification(baroData.activation);
     let wishlistSent = 0;
-    try {
-        const wishlistMatches = await getWishlistMatchesForCurrentInventory();
-        for (const [token, itemNames] of wishlistMatches) {
-            const result = await sendWishlistMatchNotification(token, itemNames);
-            if (result.success) wishlistSent++;
+
+    if (!claimed) {
+        console.log("[Baro Arrival] Arrival notification already sent for this cycle — skipping");
+    } else {
+        try {
+            await sendBaroArrivalNotification(baroData.location);
+        } catch (sendError) {
+            await releaseArrivalNotification(baroData.activation);
+            throw sendError;
         }
-        if (wishlistSent > 0) {
-            console.log(`[Baro Arrival] Sent ${wishlistSent} wishlist notification(s)`);
+
+        // Send targeted wishlist notifications
+        try {
+            const wishlistMatches = await getWishlistMatchesForCurrentInventory();
+            for (const [token, itemNames] of wishlistMatches) {
+                const result = await sendWishlistMatchNotification(token, itemNames);
+                if (result.success) wishlistSent++;
+            }
+            if (wishlistSent > 0) {
+                console.log(`[Baro Arrival] Sent ${wishlistSent} wishlist notification(s)`);
+            }
+        } catch (wishlistError) {
+            console.error("[Baro Arrival] Error sending wishlist notifications:", wishlistError);
         }
-    } catch (wishlistError) {
-        console.error("[Baro Arrival] Error sending wishlist notifications:", wishlistError);
     }
 
     return {
         updated: true,
         isActive: true,
-        notificationSent: true,
+        notificationSent: claimed,
         inventoryCount: inventoryIds.length,
         totalApiItems: baroData.inventory.length,
         unmatchedItems,

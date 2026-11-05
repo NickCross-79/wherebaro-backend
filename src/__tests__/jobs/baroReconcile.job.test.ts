@@ -23,7 +23,8 @@ jest.mock("../../services/itemService", () => ({
 jest.mock("../../services/currentService", () => ({
   fetchCurrent: jest.fn(),
   upsertCurrent: jest.fn().mockResolvedValue(undefined),
-  markArrivalNotified: jest.fn().mockResolvedValue(undefined),
+  claimArrivalNotification: jest.fn().mockResolvedValue(true),
+  releaseArrivalNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../../services/notificationService", () => ({
@@ -37,14 +38,15 @@ jest.mock("../../services/wishlistService", () => ({
 
 import { fetchBaroData } from "../../services/baroApiService";
 import { resolveBaroInventory } from "../../services/itemService";
-import { fetchCurrent, upsertCurrent, markArrivalNotified } from "../../services/currentService";
+import { fetchCurrent, upsertCurrent, claimArrivalNotification, releaseArrivalNotification } from "../../services/currentService";
 import { sendBaroArrivalNotification } from "../../services/notificationService";
 
 const mockFetchBaroData = fetchBaroData as jest.Mock;
 const mockResolve = resolveBaroInventory as jest.Mock;
 const mockFetchCurrent = fetchCurrent as jest.Mock;
 const mockUpsert = upsertCurrent as jest.Mock;
-const mockMarkNotified = markArrivalNotified as jest.Mock;
+const mockMarkNotified = claimArrivalNotification as jest.Mock;
+const mockRelease = releaseArrivalNotification as jest.Mock;
 const mockSendArrival = sendBaroArrivalNotification as jest.Mock;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -129,6 +131,27 @@ describe("baroReconcile.job", () => {
     expect(mockUpsert).toHaveBeenCalledWith(true, ACTIVATION, EXPIRY, "Orcus Relay (Pluto)", expect.any(Array));
     expect(mockSendArrival).toHaveBeenCalledWith("Orcus Relay (Pluto)");
     expect(mockMarkNotified).toHaveBeenCalledWith(ACTIVATION);
+  });
+
+  it("does not send when the arrival job claimed this cycle first", async () => {
+    // The arrival job wins the claim between our read and our send
+    mockFetchBaroData.mockResolvedValue(liveBaro());
+    mockFetchCurrent.mockResolvedValue(brokenCurrent());
+    mockMarkNotified.mockResolvedValueOnce(false);
+
+    const result = await baroReconcileJob();
+
+    expect(result).toMatchObject({ repaired: true, notificationSent: false });
+    expect(mockSendArrival).not.toHaveBeenCalled();
+  });
+
+  it("releases the claim when the arrival send fails", async () => {
+    mockFetchBaroData.mockResolvedValue(liveBaro());
+    mockFetchCurrent.mockResolvedValue(brokenCurrent());
+    mockSendArrival.mockRejectedValueOnce(new Error("db down"));
+
+    await expect(baroReconcileJob()).rejects.toThrow("db down");
+    expect(mockRelease).toHaveBeenCalledWith(ACTIVATION);
   });
 
   it("repairs an active document that has no inventory", async () => {

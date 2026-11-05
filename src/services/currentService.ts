@@ -119,3 +119,54 @@ export async function markArrivalNotified(activation: string): Promise<void> {
 
     await collections.current.updateOne({}, { $set: { arrivalNotifiedFor: activation } }, { upsert: true });
 }
+
+/**
+ * Atomically claims the right to send the arrival notification for a cycle.
+ *
+ * The arrival job (which keeps retrying for several minutes) and the hourly
+ * reconcile job can both decide Baro needs announcing at the same moment.
+ * Checking the stamp and then sending is a race: both read "not notified" and
+ * both push to every device. This compare-and-set on the single `current`
+ * document lets exactly one caller win; the other gets `false` and must not send.
+ *
+ * The stamp may have been written from a source that serializes timestamps
+ * differently, so both the raw value and its ISO form count as already claimed.
+ *
+ * Call only after the `current` document exists (both jobs upsert it first).
+ *
+ * @returns true if this caller now owns the notification for `activation`
+ */
+export async function claimArrivalNotification(activation: string): Promise<boolean> {
+    await connectToDatabase();
+
+    if (!collections.current) {
+        throw new Error("Current collection not initialized");
+    }
+
+    const parsed = new Date(activation);
+    const forms = Number.isFinite(parsed.getTime()) ? [activation, parsed.toISOString()] : [activation];
+
+    const result = await collections.current.updateOne(
+        { arrivalNotifiedFor: { $nin: forms } },
+        { $set: { arrivalNotifiedFor: activation } }
+    );
+
+    return result.modifiedCount === 1;
+}
+
+/**
+ * Gives up a claim taken with claimArrivalNotification so a later run (the
+ * reconcile job) can retry. Only clears the stamp if it still names this cycle.
+ */
+export async function releaseArrivalNotification(activation: string): Promise<void> {
+    await connectToDatabase();
+
+    if (!collections.current) {
+        throw new Error("Current collection not initialized");
+    }
+
+    await collections.current.updateOne(
+        { arrivalNotifiedFor: activation },
+        { $unset: { arrivalNotifiedFor: "" } }
+    );
+}

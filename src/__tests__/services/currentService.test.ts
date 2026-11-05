@@ -2,7 +2,12 @@
  * Tests for currentService
  */
 import { ObjectId } from "mongodb";
-import { fetchCurrent, upsertCurrent } from "../../services/currentService";
+import {
+  fetchCurrent,
+  upsertCurrent,
+  claimArrivalNotification,
+  releaseArrivalNotification,
+} from "../../services/currentService";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -169,5 +174,54 @@ describe("currentService", () => {
         upsertCurrent(false, "2025-01-10T14:00:00.000Z", "2025-01-12T14:00:00.000Z", "Strata Relay")
       ).rejects.toThrow("Current collection not initialized");
     });
+  });
+});
+
+// ─── Arrival notification claim ───────────────────────────────────────────────
+// Stops the arrival and reconcile jobs both announcing the same Baro visit.
+
+const ACTIVATION = "2026-11-13T13:00:00.000Z";
+
+describe("claimArrivalNotification", () => {
+  it("wins when the stamp does not name this cycle", async () => {
+    const updateOne = jest.fn().mockResolvedValue({ matchedCount: 1, modifiedCount: 1 });
+    mockCollections.current = { updateOne };
+
+    await expect(claimArrivalNotification(ACTIVATION)).resolves.toBe(true);
+    expect(updateOne).toHaveBeenCalledWith(
+      { arrivalNotifiedFor: { $nin: [ACTIVATION, ACTIVATION] } },
+      { $set: { arrivalNotifiedFor: ACTIVATION } }
+    );
+  });
+
+  it("loses when another run already stamped this cycle", async () => {
+    mockCollections.current = { updateOne: jest.fn().mockResolvedValue({ matchedCount: 0, modifiedCount: 0 }) };
+
+    await expect(claimArrivalNotification(ACTIVATION)).resolves.toBe(false);
+  });
+
+  it("treats a differently formatted timestamp for the same instant as already claimed", async () => {
+    const updateOne = jest.fn().mockResolvedValue({ matchedCount: 0, modifiedCount: 0 });
+    mockCollections.current = { updateOne };
+
+    await claimArrivalNotification("2026-11-13T13:00:00Z");
+
+    expect(updateOne.mock.calls[0][0]).toEqual({
+      arrivalNotifiedFor: { $nin: ["2026-11-13T13:00:00Z", ACTIVATION] },
+    });
+  });
+});
+
+describe("releaseArrivalNotification", () => {
+  it("clears the stamp only if it still names this cycle", async () => {
+    const updateOne = jest.fn().mockResolvedValue({ modifiedCount: 1 });
+    mockCollections.current = { updateOne };
+
+    await releaseArrivalNotification(ACTIVATION);
+
+    expect(updateOne).toHaveBeenCalledWith(
+      { arrivalNotifiedFor: ACTIVATION },
+      { $unset: { arrivalNotifiedFor: "" } }
+    );
   });
 });
