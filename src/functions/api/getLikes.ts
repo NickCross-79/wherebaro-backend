@@ -1,4 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { withOwnership, viewerUidFrom } from "../../utils/ownership";
 import { getLikesJob } from "../../jobs/getLikes.job";
 
 export async function getLikes(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -7,7 +8,11 @@ export async function getLikes(request: HttpRequest, context: InvocationContext)
     try {
         // Get item_id from query parameters or request body
         const bodyText = await request.text();
-        const itemId = request.query.get('item_id') || (bodyText ? JSON.parse(bodyText).item_id : undefined);
+        const body = bodyText ? JSON.parse(bodyText) : {};
+        const itemId = request.query.get('item_id') || body.item_id;
+        // The viewer's own uid comes in the POST body (never the URL, which is
+        // logged) and is only used to mark which entries are theirs.
+        const viewerUid = viewerUidFrom(body);
 
         if (!itemId) {
             return {
@@ -34,7 +39,7 @@ export async function getLikes(request: HttpRequest, context: InvocationContext)
             },
             body: JSON.stringify({
                 message: "Likes fetched successfully",
-                likes: likes,
+                likes: withOwnership(likes, viewerUid),
                 count: likes.length
             })
         };

@@ -1,4 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { withOwnership, viewerUidFrom } from "../../utils/ownership";
 import { getVotesJob } from "../../jobs/vote.job";
 
 export async function getVotes(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -17,7 +18,11 @@ export async function getVotes(request: HttpRequest, context: InvocationContext)
 
     try {
         const bodyText = await request.text();
-        const itemId = request.query.get('item_id') || (bodyText ? JSON.parse(bodyText).item_id : undefined);
+        const body = bodyText ? JSON.parse(bodyText) : {};
+        const itemId = request.query.get('item_id') || body.item_id;
+        // The viewer's own uid comes in the POST body (never the URL, which is
+        // logged) and is only used to mark which entries are theirs.
+        const viewerUid = viewerUidFrom(body);
 
         if (!itemId) {
             return {
@@ -45,7 +50,7 @@ export async function getVotes(request: HttpRequest, context: InvocationContext)
                 message: "Votes fetched successfully",
                 buyCount: result.buyCount,
                 skipCount: result.skipCount,
-                votes: result.votes
+                votes: withOwnership(result.votes, viewerUid)
             })
         };
     } catch (error) {
