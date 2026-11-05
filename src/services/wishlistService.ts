@@ -152,6 +152,33 @@ export async function replaceWishlistPushToken(oldToken: string, newToken: strin
 }
 
 /**
+ * Remove a push token from every item's wishlistPushTokens array.
+ * Used when Expo reports the device as unregistered: wishlist-only tokens are
+ * never stored in the pushTokens collection, so deactivating them there does
+ * nothing and they would otherwise be retried on every Baro visit forever.
+ * Does NOT change wishlistCount — the item is still wishlisted, the device is
+ * just unreachable.
+ * @param pushToken - The Expo push token to remove
+ */
+export async function pruneWishlistPushToken(pushToken: string): Promise<number> {
+  await connectToDatabase();
+
+  if (!collections.items) {
+    throw new Error('Items collection not initialized');
+  }
+
+  const result = await collections.items.updateMany(
+    { wishlistPushTokens: pushToken },
+    { $pull: { wishlistPushTokens: pushToken } } as any
+  );
+
+  if (result.modifiedCount > 0) {
+    console.log(`[Wishlist] Pruned dead push token from ${result.modifiedCount} item(s)`);
+  }
+  return result.modifiedCount;
+}
+
+/**
  * Get all items in the current Baro inventory that have wishlisted push tokens.
  * Queries the `current` collection for inventory item IDs, then finds which
  * of those items have non-empty wishlistPushTokens arrays.

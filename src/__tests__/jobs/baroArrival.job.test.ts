@@ -24,7 +24,8 @@ jest.mock("../../services/itemService", () => ({
 
 jest.mock("../../services/currentService", () => ({
   upsertCurrent: jest.fn().mockResolvedValue(undefined),
-  markArrivalNotified: jest.fn().mockResolvedValue(undefined),
+  claimArrivalNotification: jest.fn().mockResolvedValue(true),
+  releaseArrivalNotification: jest.fn().mockResolvedValue(undefined),
 }));
 
 jest.mock("../../services/notificationService", () => ({
@@ -38,7 +39,7 @@ jest.mock("../../services/wishlistService", () => ({
 
 import { fetchBaroData } from "../../services/baroApiService";
 import { resolveBaroInventory } from "../../services/itemService";
-import { upsertCurrent, markArrivalNotified } from "../../services/currentService";
+import { upsertCurrent, claimArrivalNotification, releaseArrivalNotification } from "../../services/currentService";
 import {
   sendBaroArrivalNotification,
   sendWishlistMatchNotification,
@@ -48,7 +49,8 @@ import { getWishlistMatchesForCurrentInventory } from "../../services/wishlistSe
 const mockFetchBaroData = fetchBaroData as jest.Mock;
 const mockResolve = resolveBaroInventory as jest.Mock;
 const mockUpsert = upsertCurrent as jest.Mock;
-const mockMarkNotified = markArrivalNotified as jest.Mock;
+const mockMarkNotified = claimArrivalNotification as jest.Mock;
+const mockRelease = releaseArrivalNotification as jest.Mock;
 const mockSendArrival = sendBaroArrivalNotification as jest.Mock;
 const mockSendWishlist = sendWishlistMatchNotification as jest.Mock;
 const mockGetWishlist = getWishlistMatchesForCurrentInventory as jest.Mock;
@@ -275,6 +277,40 @@ describe("baroArrival.job", () => {
 
     const result = await baroArrivalJob();
     expect(result.notificationSent).toBe(true); // Main notification still went through
+  });
+
+  it("does not announce again when another run already claimed this cycle", async () => {
+    mockMarkNotified.mockResolvedValueOnce(false);
+    mockGetWishlist.mockResolvedValueOnce(new Map([["tok", ["Primed Flow"]]]));
+    mockFetchBaroData.mockResolvedValue(
+      baroData({
+        activation: new Date(Date.now() - 3600_000).toISOString(),
+        expiry: new Date(Date.now() + 3600_000).toISOString(),
+        inventory: [{ uniqueName: "/Lotus/Foo", item: "Primed Flow", ducats: 300, credits: 175000 }],
+      })
+    );
+
+    const result = await baroArrivalJob();
+
+    expect(mockUpsert).toHaveBeenCalled();
+    expect(mockSendArrival).not.toHaveBeenCalled();
+    expect(mockSendWishlist).not.toHaveBeenCalled();
+    expect(result.notificationSent).toBe(false);
+  });
+
+  it("releases the claim when the arrival send fails so reconcile can retry", async () => {
+    const activation = new Date(Date.now() - 3600_000).toISOString();
+    mockSendArrival.mockRejectedValueOnce(new Error("db down"));
+    mockFetchBaroData.mockResolvedValue(
+      baroData({
+        activation,
+        expiry: new Date(Date.now() + 3600_000).toISOString(),
+        inventory: [{ uniqueName: "/Lotus/Foo", item: "Primed Flow", ducats: 300, credits: 175000 }],
+      })
+    );
+
+    await expect(baroArrivalJob()).rejects.toThrow("db down");
+    expect(mockRelease).toHaveBeenCalledWith(activation);
   });
 
   it("throws when fetchBaroData fails", async () => {

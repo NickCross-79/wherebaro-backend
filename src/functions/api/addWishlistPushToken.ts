@@ -1,4 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { Expo } from "expo-server-sdk";
 import { addWishlistPushTokenJob, WishlistPushTokenPayload } from "../../jobs/wishlistPushTokens.job";
 
 export async function addWishlistPushToken(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -16,6 +17,17 @@ export async function addWishlistPushToken(request: HttpRequest, context: Invoca
                     "Access-Control-Allow-Origin": "*"
                 },
                 body: JSON.stringify({ error: "Missing required field: item_oid" })
+            };
+        }
+
+        if (payload.pushToken && !Expo.isExpoPushToken(payload.pushToken)) {
+            return {
+                status: 400,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify({ error: "Invalid Expo push token" })
             };
         }
 

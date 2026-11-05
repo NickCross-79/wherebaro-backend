@@ -4,9 +4,13 @@
  * sends the arrival notification if this cycle never got one.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireAdminAuth } from "../../utils/auth";
 import { baroReconcileJob } from "../../jobs/baroReconcile.job";
 
 export async function baroReconcileManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "Baro reconcile");
+    if (denied) return denied;
+
     context.log(`[Manual] Baro reconcile triggered at ${new Date().toISOString()}`);
 
     try {

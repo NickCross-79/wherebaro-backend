@@ -30,6 +30,10 @@ jest.mock("expo-server-sdk", () => {
   };
 });
 
+jest.mock("../../services/wishlistService", () => ({
+  pruneWishlistPushToken: jest.fn().mockResolvedValue(0),
+}));
+
 jest.mock("../../services/pushTokenService", () => ({
   getActivePushTokens: jest.fn().mockResolvedValue([]),
   deactivatePushToken: jest.fn(),
@@ -41,6 +45,8 @@ const { __sendFn: mockSendPushNotificationsAsync, __chunkFn: mockChunkPushNotifi
 import { getActivePushTokens, deactivatePushToken } from "../../services/pushTokenService";
 const mockGetActiveTokens = getActivePushTokens as jest.Mock;
 const mockDeactivateToken = deactivatePushToken as jest.Mock;
+import { pruneWishlistPushToken } from "../../services/wishlistService";
+const mockPruneWishlist = pruneWishlistPushToken as jest.Mock;
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -124,7 +130,34 @@ describe("notificationService", () => {
       // Should not throw
       const result = await sendPushNotifications("Title", "Body");
       expect(result.success).toBe(0);
-      expect(result.failed).toBe(0);
+      expect(result.failed).toBe(1);
+    });
+
+    it("matches tickets to the right tokens when an earlier chunk fails", async () => {
+      mockGetActiveTokens.mockResolvedValue(["token-a", "token-b"]);
+      mockChunkPushNotifications.mockImplementationOnce((msgs: any[]) => msgs.map((m) => [m]));
+      mockSendPushNotificationsAsync
+        .mockRejectedValueOnce(new Error("Network error"))
+        .mockResolvedValueOnce([
+          { status: "error", message: "gone", details: { error: "DeviceNotRegistered" } },
+        ]);
+
+      const result = await sendPushNotifications("Title", "Body");
+
+      expect(result).toEqual({ success: 0, failed: 2 });
+      expect(mockDeactivateToken).toHaveBeenCalledTimes(1);
+      expect(mockDeactivateToken).toHaveBeenCalledWith("token-b");
+    });
+
+    it("prunes a DeviceNotRegistered token from item wishlists too", async () => {
+      mockGetActiveTokens.mockResolvedValue(["token-bad"]);
+      mockSendPushNotificationsAsync.mockResolvedValue([
+        { status: "error", message: "gone", details: { error: "DeviceNotRegistered" } },
+      ]);
+
+      await sendPushNotifications("Title", "Body");
+
+      expect(mockPruneWishlist).toHaveBeenCalledWith("token-bad");
     });
   });
 
@@ -157,6 +190,25 @@ describe("notificationService", () => {
       expect(sentMessages[0].title).toContain("leaving soon");
       expect(sentMessages[0].body).toContain("3");
       expect(sentMessages[0].data.type).toBe("baro-leaving-soon");
+    });
+
+    it("only goes to devices that kept departure alerts on", async () => {
+      mockGetActiveTokens.mockResolvedValue(["token-1"]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: "ok" }]);
+
+      await sendBaroDepartingSoonNotification(3);
+
+      expect(mockGetActiveTokens).toHaveBeenCalledWith("departure");
+    });
+
+    it("uses the singular for one hour", async () => {
+      mockGetActiveTokens.mockResolvedValue(["token-1"]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: "ok" }]);
+
+      await sendBaroDepartingSoonNotification(1);
+
+      const sentMessages = mockChunkPushNotifications.mock.calls[0][0];
+      expect(sentMessages[0].body).toContain("Only 1 hour remaining");
     });
   });
 

@@ -10,6 +10,7 @@
  * 4. Full arrival flow completes using only real data
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { requireAdminAuth } from "../../utils/auth";
 import { connectToDatabase, collections, db } from "../../db/database.service";
 import { ObjectId } from "mongodb";
 
@@ -17,6 +18,9 @@ import { ObjectId } from "mongodb";
 const ARRIVAL_COUNTDOWN_SECONDS = 30;
 
 export async function mockBaroAbsentHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "mock Baro absent");
+    if (denied) return denied;
+
     context.log(`[Mock Absent] Triggered at ${new Date().toISOString()}`);
 
     try {

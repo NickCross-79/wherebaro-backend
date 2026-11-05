@@ -6,6 +6,7 @@ import {
   addWishlistPushToken,
   removeWishlistPushToken,
   replaceWishlistPushToken,
+  pruneWishlistPushToken,
   getWishlistMatchesForCurrentInventory,
 } from "../../services/wishlistService";
 
@@ -128,6 +129,23 @@ describe("wishlistService", () => {
       setupCollections();
       const result = await replaceWishlistPushToken("old-token", "new-token");
       expect(result).toBe(0);
+    });
+  });
+
+  // ── pruneWishlistPushToken ─────────────────────────────────────────────────
+
+  describe("pruneWishlistPushToken", () => {
+    it("pulls the token from every item without touching wishlistCount", async () => {
+      const updateMany = jest.fn().mockResolvedValue({ modifiedCount: 3 });
+      setupCollections({ items: { updateMany } });
+
+      const count = await pruneWishlistPushToken("ExponentPushToken[dead]");
+
+      expect(count).toBe(3);
+      expect(updateMany).toHaveBeenCalledWith(
+        { wishlistPushTokens: "ExponentPushToken[dead]" },
+        { $pull: { wishlistPushTokens: "ExponentPushToken[dead]" } }
+      );
     });
   });
 

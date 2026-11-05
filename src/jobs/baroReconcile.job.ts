@@ -35,7 +35,7 @@ function isSameCycle(a?: string, b?: string): boolean {
     return Number.isFinite(left) && left === right;
 }
 import { resolveBaroInventory } from "../services/itemService";
-import { fetchCurrent, upsertCurrent, markArrivalNotified } from "../services/currentService";
+import { fetchCurrent, upsertCurrent, claimArrivalNotification, releaseArrivalNotification } from "../services/currentService";
 import { sendBaroArrivalNotification, sendWishlistMatchNotification } from "../services/notificationService";
 import { getWishlistMatchesForCurrentInventory } from "../services/wishlistService";
 
@@ -95,11 +95,17 @@ export async function baroReconcileJob() {
     let notificationSent = false;
     let wishlistSent = 0;
 
-    if (alreadyNotified) {
+    // The stamp check above is a fast path; the atomic claim is what actually
+    // prevents a duplicate when the arrival job is announcing at the same time.
+    if (alreadyNotified || !(await claimArrivalNotification(baroData.activation))) {
         console.log("[Baro Reconcile] Arrival notification already sent for this cycle — skipping");
     } else {
-        await sendBaroArrivalNotification(baroData.location);
-        await markArrivalNotified(baroData.activation);
+        try {
+            await sendBaroArrivalNotification(baroData.location);
+        } catch (sendError) {
+            await releaseArrivalNotification(baroData.activation);
+            throw sendError;
+        }
         notificationSent = true;
         console.log("[Baro Reconcile] Sent the arrival notification this cycle never got");
 
