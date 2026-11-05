@@ -1,4 +1,5 @@
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
+import { Expo } from "expo-server-sdk";
 import { registerPushTokenJob } from "../../jobs/registerPushToken.job";
 
 export async function registerPushToken(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
@@ -15,6 +16,19 @@ export async function registerPushToken(request: HttpRequest, context: Invocatio
                     "Access-Control-Allow-Origin": "*"
                 },
                 body: JSON.stringify({ error: "Missing required parameter: token" })
+            };
+        }
+
+        // Reject anything that is not an Expo push token up front, rather than
+        // storing it and discovering it is junk on Baro's next arrival.
+        if (typeof body.token !== "string" || !Expo.isExpoPushToken(body.token)) {
+            return {
+                status: 400,
+                headers: {
+                    "Content-Type": "application/json",
+                    "Access-Control-Allow-Origin": "*"
+                },
+                body: JSON.stringify({ error: "Invalid Expo push token" })
             };
         }
 

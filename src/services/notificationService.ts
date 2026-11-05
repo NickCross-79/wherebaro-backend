@@ -77,7 +77,7 @@ async function sendToTokens(
     for (const pushToken of pushTokens) {
       // Check that the token is valid
       if (!Expo.isExpoPushToken(pushToken)) {
-        console.error(`[Notifications] Invalid Expo push token: ${pushToken}`);
+        console.error(`[Notifications] Invalid Expo push token: ${truncate(pushToken)}`);
         await retireDeadToken(pushToken);
         continue;
       }
@@ -160,9 +160,10 @@ export async function sendBaroArrivalNotification(location: string): Promise<voi
  * it went to every active token regardless of preference.
  */
 export async function sendBaroDepartingSoonNotification(hoursRemaining: number): Promise<void> {
+  const hoursText = hoursRemaining === 1 ? '1 hour' : `${hoursRemaining} hours`;
   await sendPushNotifications(
     'Baro is leaving soon!',
-    `Only ${hoursRemaining} hours remaining to visit Baro Ki'teer`,
+    `Only ${hoursText} remaining to visit Baro Ki'teer`,
     { type: 'baro-leaving-soon', hoursRemaining },
     'departure'
   );
@@ -192,7 +193,7 @@ export async function sendWishlistMatchNotification(
 ): Promise<{ success: boolean }> {
   try {
     if (!Expo.isExpoPushToken(pushToken)) {
-      console.error(`[Notifications] Invalid Expo push token: ${pushToken}`);
+      console.error(`[Notifications] Invalid Expo push token: ${truncate(pushToken)}`);
       await retireDeadToken(pushToken);
       return { success: false };
     }
@@ -218,7 +219,7 @@ export async function sendWishlistMatchNotification(
     const [ticket] = await expo.sendPushNotificationsAsync([message]);
 
     if (ticket.status === 'error') {
-      console.error(`[Notifications] Wishlist notification failed for ${pushToken}: ${ticket.message}`);
+      console.error(`[Notifications] Wishlist notification failed for ${truncate(pushToken)}: ${ticket.message}`);
       if (ticket.details?.error === 'DeviceNotRegistered') {
         await retireDeadToken(pushToken);
       }

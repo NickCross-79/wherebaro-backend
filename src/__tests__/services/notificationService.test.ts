@@ -240,6 +240,16 @@ describe("notificationService", () => {
       expect(sentMessages[0].body).toContain("3");
       expect(sentMessages[0].data.type).toBe("baro-leaving-soon");
     });
+
+    it("uses the singular when one hour is left", async () => {
+      mockGetActiveTokens.mockResolvedValue(["token-1"]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: "ok" }]);
+
+      await sendBaroDepartingSoonNotification(1);
+
+      const sentMessages = mockChunkPushNotifications.mock.calls[0][0];
+      expect(sentMessages[0].body).toBe("Only 1 hour remaining to visit Baro Ki'teer");
+    });
   });
 
   // ── sendBaroDepartureNotification ──────────────────────────────────────────
