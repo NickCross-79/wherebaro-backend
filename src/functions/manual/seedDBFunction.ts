@@ -1,10 +1,18 @@
 /**
  * Manual trigger: Seed the database with wiki-scraped Baro items.
+ *
+ * Admin only, POST only. Seeding inserts every scraped item without checking
+ * for existing ones, so each call duplicates the whole item list; it must
+ * never be reachable without the key, or by a crawler following a GET link.
  */
 import { app, HttpRequest, HttpResponseInit, InvocationContext } from "@azure/functions";
 import { seedDB } from "../../jobs/seedDB.job";
+import { requireAdminAuth } from "../../utils/auth";
 
 export async function seedDBManualHttp(request: HttpRequest, context: InvocationContext): Promise<HttpResponseInit> {
+    const denied = requireAdminAuth(request, context, "seed DB");
+    if (denied) return denied;
+
     context.log(`[Manual] Seed DB triggered at ${new Date().toISOString()}`);
 
     try {
@@ -29,7 +37,7 @@ export async function seedDBManualHttp(request: HttpRequest, context: Invocation
 }
 
 app.http("seedDBFunction", {
-    methods: ["GET", "POST"],
+    methods: ["POST"],
     authLevel: "anonymous",
     handler: seedDBManualHttp,
 });
