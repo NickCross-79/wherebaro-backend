@@ -161,7 +161,35 @@ describe("notificationService", () => {
       // Should not throw
       const result = await sendPushNotifications("Title", "Body");
       expect(result.success).toBe(0);
-      expect(result.failed).toBe(0);
+      expect(result.failed).toBe(1);
+    });
+
+    it("matches tickets to the right tokens when an earlier chunk fails", async () => {
+      // One message per chunk: the first chunk throws, the second reports its
+      // device as unregistered. Only token-b may be deactivated.
+      mockGetActiveTokens.mockResolvedValue(["token-a", "token-b"]);
+      mockChunkPushNotifications.mockImplementationOnce((msgs: any[]) => msgs.map((m) => [m]));
+      mockSendPushNotificationsAsync
+        .mockRejectedValueOnce(new Error("Network error"))
+        .mockResolvedValueOnce([
+          { status: "error", message: "gone", details: { error: "DeviceNotRegistered" } },
+        ]);
+
+      const result = await sendPushNotifications("Title", "Body");
+
+      expect(result).toEqual({ success: 0, failed: 2 });
+      expect(mockDeactivateToken).toHaveBeenCalledTimes(1);
+      expect(mockDeactivateToken).toHaveBeenCalledWith("token-b");
+    });
+
+    it("counts a message with no ticket as failed without deactivating it", async () => {
+      mockGetActiveTokens.mockResolvedValue(["token-1", "token-2"]);
+      mockSendPushNotificationsAsync.mockResolvedValue([{ status: "ok" }]);
+
+      const result = await sendPushNotifications("Title", "Body");
+
+      expect(result).toEqual({ success: 1, failed: 1 });
+      expect(mockDeactivateToken).not.toHaveBeenCalled();
     });
   });
 

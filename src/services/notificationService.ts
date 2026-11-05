@@ -78,39 +78,41 @@ async function sendToTokens(
       });
     }
 
-    // Send notifications in chunks
-    const chunks = expo.chunkPushNotifications(messages);
-    const tickets: ExpoPushTicket[] = [];
-
-    for (const chunk of chunks) {
-      try {
-        const ticketChunk = await expo.sendPushNotificationsAsync(chunk);
-        tickets.push(...ticketChunk);
-      } catch (error) {
-        console.error('[Notifications] Error sending chunk:', error);
-      }
-    }
-
-    // Process tickets to handle errors
+    // Send in Expo-sized chunks and match each chunk's tickets against that
+    // chunk's own messages. Tickets come back in the order of the chunk they
+    // belong to; matching them against the whole message list breaks as soon as
+    // one chunk throws, because every later ticket shifts onto the wrong token
+    // and a DeviceNotRegistered error deactivates some other user's device.
     let successCount = 0;
     let failedCount = 0;
 
-    for (let i = 0; i < tickets.length; i++) {
-      const ticket = tickets[i];
-      const token = messages[i]?.to as string;
+    for (const chunk of expo.chunkPushNotifications(messages)) {
+      let tickets: ExpoPushTicket[];
+      try {
+        tickets = await expo.sendPushNotificationsAsync(chunk);
+      } catch (error) {
+        console.error('[Notifications] Error sending chunk:', error);
+        failedCount += chunk.length;
+        continue;
+      }
 
-      if (ticket.status === 'error') {
-        failedCount++;
-        console.error(`[Notifications] Failed for ${truncate(token)}: ${ticket.message} (${ticket.details?.error})`);
+      for (let i = 0; i < chunk.length; i++) {
+        const ticket = tickets[i];
+        const token = chunk[i].to as string;
 
-        // Only deactivate token if the device itself is unregistered
-        // Don't deactivate for server-side config issues like missing FCM key
-        if (ticket.details?.error === 'DeviceNotRegistered') {
-          console.log(`[Notifications] Deactivating unregistered device: ${truncate(token)}`);
-          await deactivatePushToken(token);
+        if (!ticket || ticket.status === 'error') {
+          failedCount++;
+          console.error(`[Notifications] Failed for ${truncate(token)}: ${ticket?.message ?? 'no ticket returned'} (${ticket?.details?.error})`);
+
+          // Only deactivate token if the device itself is unregistered
+          // Don't deactivate for server-side config issues like missing FCM key
+          if (ticket?.details?.error === 'DeviceNotRegistered') {
+            console.log(`[Notifications] Deactivating unregistered device: ${truncate(token)}`);
+            await deactivatePushToken(token);
+          }
+        } else {
+          successCount++;
         }
-      } else {
-        successCount++;
       }
     }
 
