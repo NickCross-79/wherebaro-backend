@@ -3,6 +3,7 @@
  */
 import { Expo, ExpoPushMessage, ExpoPushTicket, ExpoPushErrorReceipt } from 'expo-server-sdk';
 import { getActivePushTokens, getActiveTestPushTokens, deactivatePushToken } from './pushTokenService';
+import { pruneWishlistPushToken } from './wishlistService';
 
 const expo = new Expo();
 
@@ -12,6 +13,20 @@ const expo = new Expo();
 function truncate(value: string, maxLength: number = 20): string {
   if (!value || value.length <= maxLength) return value;
   return `${value.substring(0, maxLength)}...`;
+}
+
+/**
+ * Stop sending to a device that can never receive: deactivate its Baro-alert
+ * registration and remove it from every item wishlist it is attached to.
+ * A wishlist clean-up failure is logged, not thrown, so it can't abort a send.
+ */
+async function retireDeadToken(token: string): Promise<void> {
+  await deactivatePushToken(token);
+  try {
+    await pruneWishlistPushToken(token);
+  } catch (error) {
+    console.error(`[Notifications] Failed to prune wishlist token ${truncate(token)}:`, error);
+  }
 }
 
 /**
@@ -63,7 +78,7 @@ async function sendToTokens(
       // Check that the token is valid
       if (!Expo.isExpoPushToken(pushToken)) {
         console.error(`[Notifications] Invalid Expo push token: ${pushToken}`);
-        await deactivatePushToken(pushToken);
+        await retireDeadToken(pushToken);
         continue;
       }
 
@@ -108,7 +123,7 @@ async function sendToTokens(
           // Don't deactivate for server-side config issues like missing FCM key
           if (ticket?.details?.error === 'DeviceNotRegistered') {
             console.log(`[Notifications] Deactivating unregistered device: ${truncate(token)}`);
-            await deactivatePushToken(token);
+            await retireDeadToken(token);
           }
         } else {
           successCount++;
@@ -178,7 +193,7 @@ export async function sendWishlistMatchNotification(
   try {
     if (!Expo.isExpoPushToken(pushToken)) {
       console.error(`[Notifications] Invalid Expo push token: ${pushToken}`);
-      await deactivatePushToken(pushToken);
+      await retireDeadToken(pushToken);
       return { success: false };
     }
 
@@ -205,7 +220,7 @@ export async function sendWishlistMatchNotification(
     if (ticket.status === 'error') {
       console.error(`[Notifications] Wishlist notification failed for ${pushToken}: ${ticket.message}`);
       if (ticket.details?.error === 'DeviceNotRegistered') {
-        await deactivatePushToken(pushToken);
+        await retireDeadToken(pushToken);
       }
       return { success: false };
     }

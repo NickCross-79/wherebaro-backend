@@ -30,6 +30,10 @@ jest.mock("expo-server-sdk", () => {
   };
 });
 
+jest.mock("../../services/wishlistService", () => ({
+  pruneWishlistPushToken: jest.fn().mockResolvedValue(0),
+}));
+
 jest.mock("../../services/pushTokenService", () => ({
   getActivePushTokens: jest.fn().mockResolvedValue([]),
   deactivatePushToken: jest.fn(),
@@ -41,6 +45,8 @@ const { __sendFn: mockSendPushNotificationsAsync, __chunkFn: mockChunkPushNotifi
 import { getActivePushTokens, deactivatePushToken } from "../../services/pushTokenService";
 const mockGetActiveTokens = getActivePushTokens as jest.Mock;
 const mockDeactivateToken = deactivatePushToken as jest.Mock;
+import { pruneWishlistPushToken } from "../../services/wishlistService";
+const mockPruneWishlist = pruneWishlistPushToken as jest.Mock;
 
 // ─── Tests ───────────────────────────────────────────────────────────────────
 
@@ -182,6 +188,17 @@ describe("notificationService", () => {
       expect(mockDeactivateToken).toHaveBeenCalledWith("token-b");
     });
 
+    it("also removes a broadcast DeviceNotRegistered token from item wishlists", async () => {
+      mockGetActiveTokens.mockResolvedValue(["token-bad"]);
+      mockSendPushNotificationsAsync.mockResolvedValue([
+        { status: "error", message: "gone", details: { error: "DeviceNotRegistered" } },
+      ]);
+
+      await sendPushNotifications("Title", "Body");
+
+      expect(mockPruneWishlist).toHaveBeenCalledWith("token-bad");
+    });
+
     it("counts a message with no ticket as failed without deactivating it", async () => {
       mockGetActiveTokens.mockResolvedValue(["token-1", "token-2"]);
       mockSendPushNotificationsAsync.mockResolvedValue([{ status: "ok" }]);
@@ -279,6 +296,49 @@ describe("notificationService", () => {
       mockSendPushNotificationsAsync.mockResolvedValue([
         { status: "error", message: "Not registered", details: { error: "DeviceNotRegistered" } },
       ]);
+
+      const result = await sendWishlistMatchNotification("token-1", ["Item"]);
+
+      expect(result.success).toBe(false);
+      expect(mockDeactivateToken).toHaveBeenCalledWith("token-1");
+    });
+
+    it("removes a DeviceNotRegistered token from every item wishlist", async () => {
+      // Wishlist-only tokens never live in pushTokens, so deactivating there is
+      // not enough: without this they are retried on every Baro visit.
+      mockSendPushNotificationsAsync.mockResolvedValue([
+        { status: "error", message: "Not registered", details: { error: "DeviceNotRegistered" } },
+      ]);
+
+      await sendWishlistMatchNotification("token-1", ["Item"]);
+
+      expect(mockPruneWishlist).toHaveBeenCalledWith("token-1");
+    });
+
+    it("removes an invalid token from every item wishlist", async () => {
+      mockIsExpoPushToken.mockReturnValue(false);
+
+      await sendWishlistMatchNotification("bad-token", ["Item"]);
+
+      expect(mockPruneWishlist).toHaveBeenCalledWith("bad-token");
+    });
+
+    it("does not prune a token for a non-device error", async () => {
+      mockSendPushNotificationsAsync.mockResolvedValue([
+        { status: "error", message: "Rate limited", details: { error: "MessageRateExceeded" } },
+      ]);
+
+      await sendWishlistMatchNotification("token-1", ["Item"]);
+
+      expect(mockPruneWishlist).not.toHaveBeenCalled();
+      expect(mockDeactivateToken).not.toHaveBeenCalled();
+    });
+
+    it("still reports the failure if pruning the wishlists throws", async () => {
+      mockSendPushNotificationsAsync.mockResolvedValue([
+        { status: "error", message: "Not registered", details: { error: "DeviceNotRegistered" } },
+      ]);
+      mockPruneWishlist.mockRejectedValueOnce(new Error("db down"));
 
       const result = await sendWishlistMatchNotification("token-1", ["Item"]);
 
